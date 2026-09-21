@@ -34,8 +34,8 @@ docs/
 .vercel/
 
 # Solidity tooling and test evidence are not needed for the frontend build.
-lib/
-test/
-script/
+/lib/
+/test/
+/script/
 web/e2e/
 web/test/
