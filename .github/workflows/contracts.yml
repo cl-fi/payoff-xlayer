@@ -1,0 +1,32 @@
+name: Solidity checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_fork:
+        description: Run the pinned X Layer fork tests (requires public archive RPC availability)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run fmt:check
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:sdk
+      - if: github.event_name == 'workflow_dispatch' && inputs.run_fork
+        run: npm run test:fork

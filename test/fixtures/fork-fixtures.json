@@ -1,0 +1,14 @@
+{
+  "blockNumber": "70938201",
+  "source": "Transfer logs at or before the pinned block; balances read at that block. Accounts are impersonated only in local fork tests.",
+  "holders": {
+    "NVDAx": {
+      "address": "0xa8ddb5Cd96b5222AFe198316E9A57CAA642850D5",
+      "balance": "2502679085771162633679"
+    },
+    "USDG": {
+      "address": "0x7797c4A7f786F77dBce13d71D2C710310Cb92aA3",
+      "balance": "3612298476"
+    }
+  }
+}

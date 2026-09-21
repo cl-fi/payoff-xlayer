@@ -1,0 +1,71 @@
+name: payoff
+
+x-gateway-image: &gateway-image
+  image: payoff-rfq-gateway:local
+  build:
+    context: ../..
+    dockerfile: gateway/Dockerfile
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: payoff
+      POSTGRES_DB: payoff
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a random database password in deploy/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U payoff -d payoff"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    <<: *gateway-image
+    command: [node, dist/migrate.js]
+    environment:
+      DATABASE_URL: postgresql://payoff:${POSTGRES_PASSWORD}@postgres:5432/payoff
+    networks: [database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  gateway:
+    <<: *gateway-image
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://payoff:${POSTGRES_PASSWORD}@postgres:5432/payoff
+      GATEWAY_CONFIG_PATH: /run/payoff/config.json
+      HOST: 0.0.0.0
+      NODE_ENV: production
+    volumes:
+      - ../config.local.json:/run/payoff/config.json:ro
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+    networks: [database, dealers]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    stop_grace_period: 45s
+
+volumes:
+  postgres_data:
+
+networks:
+  database:
+    internal: true
+  dealers:
+    name: payoff_dealers

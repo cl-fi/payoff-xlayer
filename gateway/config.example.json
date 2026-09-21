@@ -1,0 +1,30 @@
+{
+  "chainId": 196,
+  "exchange": "REPLACE_WITH_DEPLOYED_RFQ_EXCHANGE",
+  "usdg": "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8",
+  "rpcUrlEnv": "XLAYER_RPC_URL",
+  "markets": [
+    { "vault": "REPLACE_WITH_DEPLOYED_SERIES_VAULT", "seriesIds": ["1", "2"] }
+  ],
+  "dealers": [
+    {
+      "id": "self",
+      "name": "Payoff self-operated dealer",
+      "address": "REPLACE_WITH_WHITELISTED_DEALER_ADDRESS",
+      "url": "http://self-dealer:9000/v1/quote",
+      "allowHttp": true,
+      "enabled": true,
+      "source": "live",
+      "bearerTokenEnv": "SELF_DEALER_API_TOKEN"
+    }
+  ],
+  "allowedOrigins": ["https://REPLACE_WITH_FRONTEND_DOMAIN"],
+  "trustedProxies": [],
+  "collectMs": 800,
+  "rpcTimeoutMs": 3000,
+  "requestTimeoutMs": 20000,
+  "maxBlockAgeSeconds": 60,
+  "confirmations": 2,
+  "requestsPerMinute": 60,
+  "maxConcurrentRfqs": 32
+}

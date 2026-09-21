@@ -1,0 +1,4 @@
+# Run this HTTPS reverse proxy on the VPS host, in front of the loopback-only gateway port.
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}

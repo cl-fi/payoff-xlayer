@@ -1,0 +1,32 @@
+{
+  "name": "payoff-xlayer",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["gateway", "web"],
+  "description": "Payoff Solidity development and X Layer asset verification",
+  "scripts": {
+    "build": "node scripts/forge.mjs build",
+    "test": "node scripts/forge.mjs test --no-match-path 'test/fork/*'",
+    "test:fork": "node scripts/forge.mjs test --match-path 'test/fork/*' -vv",
+    "test:sdk": "node scripts/quote-vector.mjs && node --test test/sdk/*.test.mjs",
+    "fmt": "node scripts/forge.mjs fmt",
+    "fmt:check": "node scripts/forge.mjs fmt --check",
+    "probe:assets": "node scripts/probe-assets.mjs",
+    "build:gateway": "npm run build --workspace @payoff/rfq-gateway",
+    "test:gateway": "npm test --workspace @payoff/rfq-gateway",
+    "test:gateway:integration": "npm run test:integration --workspace @payoff/rfq-gateway",
+    "start:gateway": "npm start --workspace @payoff/rfq-gateway",
+    "gateway:migrate": "npm run migrate --workspace @payoff/rfq-gateway",
+    "dev:web": "npm run dev --workspace @payoff/web",
+    "build:web": "npm run build --workspace @payoff/web",
+    "start:web": "npm start --workspace @payoff/web",
+    "test:web": "npm test --workspace @payoff/web",
+    "test:web:e2e": "npm run test:e2e --workspace @payoff/web"
+  },
+  "devDependencies": {
+    "@foundry-rs/cast": "1.7.1",
+    "@foundry-rs/forge": "1.7.1",
+    "@openzeppelin/contracts": "5.4.0",
+    "viem": "2.56.7"
+  }
+}

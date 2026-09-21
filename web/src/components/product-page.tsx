@@ -1,0 +1,585 @@
+'use client';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useProduct } from './provider';
+import { Icon } from './icon';
+import { Modal } from './modal';
+import { DEMO_ACCOUNT, DemoAdapter, isPrepared } from '@/lib/data/demo';
+import { amount, dateTime, precise, previewOrder, ratio, stockTarget } from '@/lib/amounts';
+import { quoteTerms, type AppQuote, type Position } from '@/lib/types';
+import { friendlyError } from '@/lib/wallet';
+
+export function ProductPage() {
+  const { adapter, market, balances, connection, setWalletOpen, reload, scenario, revision, config } =
+    useProduct();
+  const [side, setSide] = useState<0 | 1>(0),
+    [selectedSeries, setSelectedSeries] = useState<string | null>(null),
+    [quantity, setQuantity] = useState('1');
+  const [quote, setQuote] = useState<AppQuote | null>(null),
+    [dialog, setDialog] = useState<'assets' | 'quote' | 'success' | null>(null);
+  const [busy, setBusy] = useState(''),
+    [message, setMessage] = useState(''),
+    [accepted, setAccepted] = useState(false),
+    [completed, setCompleted] = useState<Position | null>(null);
+  const [now, setNow] = useState(0),
+    operation = useRef(0);
+  useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const available = market?.series.filter((s) => s.side === side) ?? [];
+  const series = available.find((s) => s.id === selectedSeries) ?? available[0];
+  const calculation = useMemo(() => {
+    if (!market || !series) return { preview: null, error: '' };
+    try {
+      return {
+        preview: previewOrder(quantity, series, market, connection?.address ?? DEMO_ACCOUNT),
+        error: '',
+      };
+    } catch (e) {
+      return { preview: null, error: friendlyError(e) };
+    }
+  }, [quantity, series, market, connection?.address]);
+  const preview = calculation.preview,
+    prepared = !!(balances && preview && isPrepared(balances, preview));
+  const terms = quote ? quoteTerms(quote) : null,
+    remaining = terms ? Math.max(0, Math.ceil(Number(terms.deadline) - now / 1000)) : 0;
+  const cutoff = !!series && now > Number(series.tradeCutoff) * 1000;
+  // Changing any order input invalidates both the visible quote and responses still in flight.
+  useEffect(() => {
+    operation.current++;
+    setQuote(null);
+    setDialog(null);
+    setAccepted(false);
+    setMessage('');
+    setBusy('');
+  }, [quantity, side, series?.id, connection?.address, scenario, revision]);
+  useEffect(
+    () => () => {
+      operation.current++;
+    },
+    [],
+  );
+  async function inquire() {
+    if (!adapter || !preview || !connection) return;
+    const op = ++operation.current;
+    setBusy('Requesting a dealer quote…');
+    setMessage('');
+    try {
+      const result = await adapter.quote(preview, crypto.randomUUID(), scenario);
+      if (op !== operation.current) return;
+      if (!result) {
+        setMessage(
+          'No quotes are available right now. Your assets are still in your account. Please try again later.',
+        );
+        setDialog(null);
+        return;
+      }
+      setQuote(result);
+      setAccepted(false);
+      setNow(Date.now());
+      setDialog('quote');
+    } catch (e) {
+      if (op === operation.current) setMessage(friendlyError(e));
+    } finally {
+      if (op === operation.current) setBusy('');
+    }
+  }
+  async function prepare() {
+    if (!(adapter instanceof DemoAdapter) || !preview) return;
+    const op = ++operation.current;
+    setBusy('Simulating asset preparation…');
+    setMessage('');
+    try {
+      await adapter.prepareAssets(preview);
+      if (op !== operation.current) return;
+      await reload();
+      if (op === operation.current) setDialog(null);
+    } catch (e) {
+      if (op === operation.current) setMessage(friendlyError(e));
+    } finally {
+      if (op === operation.current) setBusy('');
+    }
+  }
+  async function fill() {
+    if (!adapter || !preview || !quote || !accepted || remaining <= 0) return;
+    // This release only settles the local demo ledger. No mock reaches a wallet send path.
+    if (!(adapter instanceof DemoAdapter) || quote.kind !== 'demo') {
+      setMessage('Testnet trading will be available after gateway and contract integration.');
+      return;
+    }
+    const op = ++operation.current;
+    setBusy('Simulating position opening…');
+    setMessage('');
+    try {
+      await adapter.prepare(quote);
+      const position = await adapter.fill(preview, quote, scenario);
+      if (op !== operation.current) return;
+      setCompleted(position);
+      setQuote(null);
+      setDialog('success');
+      await reload();
+    } catch (e) {
+      if (op === operation.current) setMessage(friendlyError(e));
+    } finally {
+      if (op === operation.current) setBusy('');
+    }
+  }
+  const primary = () => {
+    if (!connection) {
+      setWalletOpen(true);
+      return;
+    }
+    if (!prepared) {
+      setMessage('');
+      setDialog('assets');
+      return;
+    }
+    void inquire();
+  };
+  const isPut = side === 0;
+  return (
+    <div className="page product-page">
+      <section className="page-intro">
+        <div>
+          <div className="eyebrow">
+            <span className="teal-line" /> YOUR PRICE. YOUR PAYOFF.
+          </div>
+          <h1>Make your waiting count.</h1>
+          <p>Set a price you are willing to buy or sell at, and earn a premium upfront.</p>
+        </div>
+        <Link className="text-link intro-link" href="/how-it-works">
+          See how it works <Icon name="arrow" size={17} />
+        </Link>
+      </section>
+      <div className="product-grid">
+        <section className="strategy-panel">
+          <div className="asset-header">
+            <div className="asset-identity">
+              <div className="stock-avatar">N</div>
+              <div>
+                <h2>
+                  NVDAx <span className="subtle-badge">xStocks</span>
+                </h2>
+                <p>NVIDIA · Tokenized stock</p>
+              </div>
+            </div>
+            <span className="asset-tag">
+              <span className="teal-dot" />
+              {config.mode === 'demo' ? 'Demo product' : 'Testnet product'}
+            </span>
+          </div>
+          <div className="strategy-tabs" role="tablist" aria-label="Strategy">
+            <button
+              role="tab"
+              aria-selected={isPut}
+              onClick={() => setSide(0)}
+              className={isPut ? 'selected' : ''}
+            >
+              <Icon name="down" />
+              <span>
+                Buy Low<small>Set a target buying price</small>
+              </span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={!isPut}
+              onClick={() => setSide(1)}
+              className={!isPut ? 'selected' : ''}
+            >
+              <Icon name="up" />
+              <span>
+                Sell High<small>Set a target selling price</small>
+              </span>
+            </button>
+          </div>
+          <div className="strategy-content">
+            <div className="eyebrow">{isPut ? 'BUY LOWER' : 'SELL HIGHER'}</div>
+            <h2>{isPut ? 'Get paid to wait for your price.' : 'Give your holdings a selling target.'}</h2>
+            <p className="strategy-description">
+              {isPut
+                ? 'Deposit USDG and collect a premium upfront. If the dealer exercises, buy wrapped stocks on the agreed terms. Otherwise, reclaim your USDG at expiry.'
+                : 'Deposit wrapped stocks and collect a premium upfront. If the dealer exercises, sell on the agreed terms. Otherwise, reclaim your wrapped stocks at expiry.'}
+            </p>
+            <div className="outcome-visual">
+              <div className="visual-label">
+                <span>One order. Two possible outcomes.</span>
+                <span>Keep the premium in either case</span>
+              </div>
+              <div className="flow-source">
+                <span className="flow-icon">
+                  <Icon name={isPut ? 'wallet' : 'layers'} />
+                </span>
+                <div>
+                  <small>You lock</small>
+                  <strong>{isPut ? 'USDG' : 'wNVDAx'}</strong>
+                </div>
+                <span className="premium-pill">＋ Earn a premium</span>
+              </div>
+              <div className="flow-branches">
+                <div>
+                  <span className="branch-caption">Dealer exercises</span>
+                  <strong>{isPut ? 'Receive wrapped stocks' : 'Receive USDG'}</strong>
+                  <small>{isPut ? 'Buy for the agreed amount' : 'Sell for the agreed amount'}</small>
+                </div>
+                <div>
+                  <span className="branch-caption">Expires without exercise</span>
+                  <strong>{isPut ? 'Reclaim USDG' : 'Reclaim wrapped stocks'}</strong>
+                  <small>You keep the premium</small>
+                </div>
+              </div>
+            </div>
+            <p className="fine-print rule-note">
+              <Icon name="info" size={15} />
+              The dealer chooses whether to exercise. Reaching the target price does not trigger automatic
+              settlement.
+            </p>
+          </div>
+          <div className="strategy-bottom">
+            <span>
+              <Icon name="shield" size={16} />
+              Fully collateralized
+            </span>
+            <span>
+              <Icon name="layers" size={16} />
+              Fixed wrapped units
+            </span>
+            <span>
+              <Icon name="clock" size={16} />
+              Defined expiry
+            </span>
+          </div>
+        </section>
+        <section className="order-card" aria-label="Create order">
+          <div className="order-heading">
+            <h2>Create {isPut ? 'Buy Low' : 'Sell High'} order</h2>
+            <span className="subtle-badge">NVDAx</span>
+          </div>
+          <label className="field-label">
+            Choose a series <span>Fixed expiry</span>
+          </label>
+          <div className="tenor-options">
+            {available.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setSelectedSeries(s.id)}
+                className={s.id === series?.id ? 'selected' : ''}
+              >
+                <strong>{s.days} days</strong>
+                <small>{dateTime(s.exerciseEnd)} expiry</small>
+              </button>
+            ))}
+            {!available.length && <div className="skeleton" />}
+          </div>
+          <div className="target-block">
+            <div>
+              <span className="field-label">
+                Reference {isPut ? 'buy' : 'sell'} price <span>per NVDAx</span>
+              </span>
+              <strong>
+                {series && market ? amount(stockTarget(series, market.rate)) : '—'} <small>USDG</small>
+              </strong>
+            </div>
+            <span className="target-icon">
+              <Icon name={isPut ? 'down' : 'up'} size={24} />
+            </span>
+          </div>
+          <label className="field-label" htmlFor="quantity">
+            Stock quantity <span>At the current exchange rate</span>
+          </label>
+          <div className={`quantity-input ${calculation.error ? 'invalid' : ''}`}>
+            <input
+              id="quantity"
+              inputMode="decimal"
+              autoComplete="off"
+              value={quantity}
+              aria-invalid={!!calculation.error}
+              aria-describedby={calculation.error ? 'quantity-error' : 'quantity-help'}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+            <span>NVDAx</span>
+          </div>
+          {calculation.error ? (
+            <p id="quantity-error" className="field-error">
+              {calculation.error}
+            </p>
+          ) : (
+            <p id="quantity-help" className="input-help">
+              ≈ {preview ? amount(preview.wrappedQuantity, 18, 6) : '—'} wNVDAx. Settlement uses this fixed
+              quantity.
+            </p>
+          )}
+          <div className="order-summary">
+            <div>
+              <span>{isPut ? 'USDG to lock' : 'Wrapped stocks to lock'}</span>
+              <strong>
+                {preview
+                  ? isPut
+                    ? `${amount(preview.strikeAmountUSDG)} USDG`
+                    : `${amount(preview.wrappedQuantity, 18, 6)} wNVDAx`
+                  : '—'}
+              </strong>
+            </div>
+            <div>
+              <span>Net premium</span>
+              <span className="muted">Available after quoting</span>
+            </div>
+            <div>
+              <span>Exercise window</span>
+              <span>
+                {series
+                  ? `${dateTime(series.exerciseStart)} · ${(Number(series.exerciseEnd) - Number(series.exerciseStart)) / 60} min`
+                  : '—'}
+              </span>
+            </div>
+          </div>
+          {balances && (
+            <div className="available-balance">
+              <Icon name="wallet" size={14} />
+              Available:
+              {isPut
+                ? `${amount(balances.usdg)} USDG`
+                : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
+            </div>
+          )}
+          {message && !dialog && (
+            <div role="alert" className="notice">
+              {message}
+            </div>
+          )}
+          <button
+            className="button primary full main-cta"
+            onClick={primary}
+            disabled={!!busy || !preview || cutoff}
+          >
+            {busy ? (
+              <>
+                <span className="spinner" />
+                {busy}
+              </>
+            ) : cutoff ? (
+              'Series closed to new positions'
+            ) : !connection ? (
+              'Connect to get started'
+            ) : !prepared ? (
+              'Prepare assets'
+            ) : (
+              'Get a quote'
+            )}
+            {!busy && !cutoff && <Icon name="arrow" size={18} />}
+          </button>
+          <p className="cta-note">
+            {config.mode === 'demo'
+              ? 'Demo quotes only · No real assets needed'
+              : 'Quotes requested directly from the gateway'}
+          </p>
+          {preview && (
+            <details className="technical-details">
+              <summary>
+                View settlement terms <Icon name="chevron" size={14} />
+              </summary>
+              <dl>
+                <dt>Fixed delivery quantity</dt>
+                <dd>{precise(preview.wrappedQuantity)} wNVDAx</dd>
+                <dt>Fixed settlement amount</dt>
+                <dd>{precise(preview.strikeAmountUSDG, 6)} USDG</dd>
+                <dt>Current wrapping rate</dt>
+                <dd>1 wNVDAx = {market && precise(market.rate)} NVDAx</dd>
+                <dt>Trading cutoff</dt>
+                <dd>{dateTime(preview.series.tradeCutoff)}</dd>
+              </dl>
+              <p>
+                The reference target uses the current exchange rate. After opening, wrapped units and the
+                settlement amount are fixed. Underlying rights affected by dividends and splits transfer with
+                the wrapped tokens.
+              </p>
+            </details>
+          )}
+        </section>
+      </div>
+      <section className="process-strip">
+        <div>
+          <span>01</span>
+          <div>
+            <h3>Choose your target</h3>
+            <p>Pick a strategy, quantity and expiry</p>
+          </div>
+        </div>
+        <div>
+          <span>02</span>
+          <div>
+            <h3>Review your quote</h3>
+            <p>Review your net premium and both outcomes</p>
+          </div>
+        </div>
+        <div>
+          <span>03</span>
+          <div>
+            <h3>Track your position</h3>
+            <p>Claim your assets after exercise or expiry</p>
+          </div>
+        </div>
+      </section>
+      <Modal
+        open={dialog === 'assets'}
+        onClose={() => {
+          if (!busy) setDialog(null);
+        }}
+        title="Prepare your assets"
+        eyebrow="STEP 01 / ASSETS"
+      >
+        <p className="muted modal-intro">
+          {isPut
+            ? 'Approve the USDG needed for this order. Funds remain in your account until you confirm the trade.'
+            : 'Wrap the NVDAx needed into wNVDAx, then approve the Vault. Wrapping does not open a position.'}
+        </p>
+        <div className="receipt-list">
+          <div>
+            <span>{isPut ? 'Approval amount' : 'Wrapped token approval'}</span>
+            <strong>
+              {preview &&
+                (isPut
+                  ? `${amount(preview.strikeAmountUSDG)} USDG`
+                  : `${amount(preview.wrappedQuantity, 18, 6)} wNVDAx`)}
+            </strong>
+          </div>
+          <div>
+            <span>Approval scope</span>
+            <span>This order only</span>
+          </div>
+        </div>
+        {message && (
+          <div role="alert" className="notice error">
+            {message}
+          </div>
+        )}
+        {config.mode === 'demo' ? (
+          <>
+            <div className="notice">
+              Wrapping and approval are simulated. No wallet signature is requested.
+            </div>
+            <button className="button primary full" disabled={!!busy} onClick={() => void prepare()}>
+              {busy || 'Simulate asset preparation'}
+            </button>
+          </>
+        ) : (
+          <div className="notice">
+            Testnet asset preparation and trading will be enabled after integration. You can browse products
+            and quotes in this version.
+          </div>
+        )}
+      </Modal>
+      <Modal
+        open={dialog === 'quote'}
+        onClose={() => {
+          if (!busy) setDialog(null);
+        }}
+        title="Confirm your quote"
+        eyebrow="STEP 02 / YOUR QUOTE"
+      >
+        {terms && preview && (
+          <>
+            <div className="quote-countdown">
+              <span>
+                <span className={remaining > 0 ? 'teal-dot' : 'expired-dot'} />
+                {quote?.kind === 'demo' ? 'Fixed demo quote' : 'Dealer quote'}
+              </span>
+              <strong className={remaining ? '' : 'danger-text'}>
+                {remaining > 0 ? `Expires in ${remaining}s` : 'Quote expired'}
+              </strong>
+            </div>
+            <div className="premium-display">
+              <span>Paid upfront · Net premium</span>
+              <strong>
+                {amount(terms.netPremiumUSDG, 6, 4)} <small>USDG</small>
+              </strong>
+              <p>
+                Term premium / settlement amount = {ratio(terms.netPremiumUSDG, terms.strikeAmountUSDG)}%
+                <span>Not annualized</span>
+              </p>
+            </div>
+            <div className="receipt-list">
+              <div>
+                <span>Strategy / series</span>
+                <strong>
+                  {isPut ? 'Buy Low' : 'Sell High'} · {series?.days} days
+                </strong>
+              </div>
+              <div>
+                <span>Settlement amount</span>
+                <strong>{amount(terms.strikeAmountUSDG)} USDG</strong>
+              </div>
+              <div>
+                <span>Delivery quantity</span>
+                <strong>{amount(terms.wrappedQuantity, 18, 6)} wNVDAx</strong>
+              </div>
+              <div>
+                <span>Gross premium</span>
+                <span>{amount(terms.grossPremiumUSDG, 6, 4)} USDG</span>
+              </div>
+              <div>
+                <span>Protocol fee</span>
+                <span>− {amount(terms.protocolFeeUSDG, 6, 4)} USDG</span>
+              </div>
+              <div>
+                <span>Quoted by</span>
+                <span>{quote?.kind === 'demo' ? quote.dealerName : quote?.selection.dealerName}</span>
+              </div>
+            </div>
+            <label className="consent">
+              <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+              <span>
+                I understand that assets are locked until exercise or expiry. Settlement transfers a fixed
+                quantity of wrapped stocks, together with their underlying rights.
+              </span>
+            </label>
+            {message && (
+              <div role="alert" className="notice error">
+                {message}
+              </div>
+            )}
+            {remaining > 0 ? (
+              <button
+                className="button primary full"
+                disabled={!accepted || !!busy || config.mode !== 'demo'}
+                onClick={() => void fill()}
+              >
+                {busy || (config.mode === 'demo' ? 'Confirm demo trade' : 'Testnet trading coming soon')}
+              </button>
+            ) : (
+              <button className="button primary full" disabled={!!busy} onClick={() => void inquire()}>
+                {busy || 'Get a new quote'}
+              </button>
+            )}
+            <p className="fine-print">
+              Quotes must pass execution checks before they expire. Demo actions do not create onchain
+              positions.
+            </p>
+          </>
+        )}
+      </Modal>
+      <Modal
+        open={dialog === 'success'}
+        onClose={() => setDialog(null)}
+        title="Your position is open."
+        eyebrow="DEMO POSITION OPENED"
+      >
+        <div className="success-icon">
+          <Icon name="check" size={32} />
+        </div>
+        <p className="success-copy">
+          Demo position created. <strong>{completed && amount(completed.netPremiumUSDG, 6, 4)} USDG</strong>{' '}
+          in net premium has been added to your demo balance.
+        </p>
+        <p className="muted center">
+          View the terms in My positions, or simulate both outcomes and claim your assets.
+        </p>
+        <Link href="/positions" className="button primary full" onClick={() => setDialog(null)}>
+          View my positions <Icon name="arrow" size={17} />
+        </Link>
+        <p className="fine-print center">Saved in this browser only. No onchain transaction was sent.</p>
+      </Modal>
+    </div>
+  );
+}

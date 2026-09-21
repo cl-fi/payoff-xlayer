@@ -1,0 +1,22 @@
+{
+  "chainId": 196,
+  "exchange": "0x1111111111111111111111111111111111111111",
+  "quote": {
+    "requestId": "0xabababababababababababababababababababababababababababababababab",
+    "vault": "0x2222222222222222222222222222222222222222",
+    "dealer": "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf",
+    "taker": "0x3333333333333333333333333333333333333333",
+    "seriesId": "7",
+    "wrappedQuantity": "123456789012345678",
+    "strikeAmountUSDG": "24691358",
+    "grossPremiumUSDG": "2000000",
+    "protocolFeeUSDG": "20000",
+    "netPremiumUSDG": "1980000",
+    "issuedAt": "1800000000",
+    "deadline": "1800000020",
+    "nonce": "9007199254740993"
+  },
+  "structHash": "0xbc24addc7189e991655aeefcc27b5b506e400bdbd333ed35594e154a9bdb7383",
+  "digest": "0x28017a11bc2c4cc0c8783fe3fa31534fa0ac9eb8d954249f2235ce34bd2c6362",
+  "signature": "0x51297ce15fb636a1797ff4831e6c892d54e3e17d6148b385763c830be7452052399d8bf0c949a2fafe5ba84724d6a545384f7eba16e3382b28b1358091d5eab71b"
+}

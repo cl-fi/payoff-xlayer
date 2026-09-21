@@ -1,0 +1,19 @@
+{
+  "chainId": 196,
+  "rpc": "https://rpc.xlayer.tech",
+  "tokens": {
+    "NVDAx": {
+      "address": "0xc845b2894dbddd03858fd2d643b4ef725fe0849d",
+      "decimals": 18
+    },
+    "USDG": {
+      "address": "0x4ae46a509f6b1d9056937ba4500cb143933d2dc8",
+      "decimals": 6
+    },
+    "wNVDAx": {
+      "address": "0xa8ddb5cd96b5222afe198316e9a57caa642850d5",
+      "decimals": 18,
+      "underlying": "NVDAx"
+    }
+  }
+}
