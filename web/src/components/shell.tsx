@@ -35,7 +35,9 @@ export function Shell({ children }: { children: ReactNode }) {
         <span className="environment-message">
           {config.mode === 'demo'
             ? 'Fixed test quotes · Simulated assets and trades. No onchain transactions.'
-            : 'Test assets only · Trades are verified against onchain receipts.'}
+            : config.mode === 'testnet'
+              ? 'Onchain series and wallet balances · Quote service not connected.'
+              : 'Test assets only · Trading integration in progress.'}
         </span>
       </div>
       <header className="site-header">
@@ -84,6 +86,13 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main id="main">
+        {config.mode !== 'demo' && connection?.kind === 'wallet' && connection.chainId !== config.chainId && (
+          <div className="global-alert" role="status">
+            <Icon name="info" />
+            <span>Your wallet is on another network. Data shown here is from X Layer Testnet.</span>
+            <button onClick={() => setWalletOpen(true)}>Switch network</button>
+          </div>
+        )}
         {error && (
           <div className="global-alert" role="alert">
             <Icon name="info" />

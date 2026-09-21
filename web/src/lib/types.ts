@@ -2,7 +2,7 @@ import type { Address } from 'viem';
 import type { Order, Quote, Selection, Settlement, Series } from '../../../gateway/src/types';
 export type { Order, Quote, Selection, Settlement };
 
-export type Mode = 'demo' | 'gateway';
+export type Mode = 'demo' | 'testnet' | 'gateway';
 export type Scenario = 'normal' | 'no-quote' | 'expired' | 'rejected' | 'failed' | 'offline';
 export type ProductSeries = Series & { id: string; days: number; vault: Address; label: string };
 export type Market = {
@@ -17,6 +17,7 @@ export type Market = {
   series: ProductSeries[];
 };
 export type Balances = {
+  okb?: string;
   usdg: string;
   stock: string;
   wrapped: string;

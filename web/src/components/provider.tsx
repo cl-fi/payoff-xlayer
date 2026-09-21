@@ -14,6 +14,7 @@ import { getAddress, type Address } from 'viem';
 import { getConfig, type Config } from '@/lib/config';
 import { DEMO_ACCOUNT, DemoAdapter, STORAGE_PREFIX, initialDemoState } from '@/lib/data/demo';
 import { GatewayAdapter } from '@/lib/data/gateway';
+import { TestnetAdapter } from '@/lib/data/testnet';
 import type { Balances, Market, Position, ProductAdapter, Scenario } from '@/lib/types';
 import {
   connectWallet,
@@ -82,7 +83,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     generation.current++;
     setAdapter(
-      config.mode === 'demo' ? new DemoAdapter(localStorage, currentAccount) : new GatewayAdapter(config),
+      config.mode === 'demo'
+        ? new DemoAdapter(localStorage, currentAccount)
+        : config.mode === 'testnet'
+          ? new TestnetAdapter(config)
+          : new GatewayAdapter(config),
     );
     setMarket(null);
     setBalances(null);
@@ -146,7 +151,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (gen === generation.current && req === request.current) {
         setError(friendlyError(e));
+        setMarket(null);
         setBalances(null);
+        setPositions([]);
       }
     } finally {
       if (gen === generation.current && req === request.current) setLoading(false);
@@ -328,7 +335,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 <Icon name="arrow" />
               </button>
             )}
-            <div className="section-divider">Or connect your wallet</div>
+            <div className="section-divider">
+              {config.mode === 'demo' ? 'Or connect your wallet' : 'Choose your wallet'}
+            </div>
             {wallets.map((w) => (
               <button
                 key={w.id}

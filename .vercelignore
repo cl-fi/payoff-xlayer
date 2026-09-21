@@ -1,3 +1,4 @@
+# Keep local credentials, private notes and generated files out of CLI uploads.
 node_modules/
 out/
 cache/
@@ -31,3 +32,10 @@ docs/
 
 # Local Vercel project binding and downloaded environment files.
 .vercel/
+
+# Solidity tooling and test evidence are not needed for the frontend build.
+lib/
+test/
+script/
+web/e2e/
+web/test/

@@ -18,6 +18,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run test:web:e2e
+      - run: npm run test:e2e:testnet --workspace @payoff/web
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

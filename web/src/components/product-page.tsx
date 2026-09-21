@@ -5,15 +5,28 @@ import { useProduct } from './provider';
 import { Icon } from './icon';
 import { Modal } from './modal';
 import { DEMO_ACCOUNT, DemoAdapter, isPrepared } from '@/lib/data/demo';
-import { amount, dateTime, precise, previewOrder, ratio, stockTarget } from '@/lib/amounts';
+import { amount, dateOnly, dateTime, precise, previewOrder, ratio, stockTarget } from '@/lib/amounts';
+import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
 import { quoteTerms, type AppQuote, type Position } from '@/lib/types';
 import { friendlyError } from '@/lib/wallet';
 
 export function ProductPage() {
-  const { adapter, market, balances, connection, setWalletOpen, reload, scenario, revision, config } =
-    useProduct();
+  const {
+    adapter,
+    market,
+    balances,
+    connection,
+    setWalletOpen,
+    reload,
+    scenario,
+    revision,
+    config,
+    loading,
+    error,
+  } = useProduct();
   const [side, setSide] = useState<0 | 1>(0),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
+    [selectedExpiry, setSelectedExpiry] = useState<string | null>(null),
     [quantity, setQuantity] = useState('1');
   const [quote, setQuote] = useState<AppQuote | null>(null),
     [dialog, setDialog] = useState<'assets' | 'quote' | 'success' | null>(null);
@@ -28,8 +41,21 @@ export function ProductPage() {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const available = market?.series.filter((s) => s.side === side) ?? [];
-  const series = available.find((s) => s.id === selectedSeries) ?? available[0];
+  const available = market?.series.filter((s) => s.side === side && Number(s.tradeCutoff) * 1000 > now) ?? [];
+  const expiries = [...new Set(available.map((s) => s.exerciseEnd))].sort((a, b) => Number(a) - Number(b));
+  const expiry = selectedExpiry && expiries.includes(selectedExpiry) ? selectedExpiry : expiries[0];
+  const pricedSeries = available
+    .filter((s) => s.exerciseEnd === expiry)
+    .sort((a, b) => {
+      const comparison =
+        BigInt(a.strikePricePerWrappedUSDG) < BigInt(b.strikePricePerWrappedUSDG)
+          ? -1
+          : BigInt(a.strikePricePerWrappedUSDG) > BigInt(b.strikePricePerWrappedUSDG)
+            ? 1
+            : 0;
+      return side === 0 ? -comparison : comparison;
+    });
+  const series = pricedSeries.find((s) => s.id === selectedSeries) ?? pricedSeries[0];
   const calculation = useMemo(() => {
     if (!market || !series) return { preview: null, error: '' };
     try {
@@ -45,7 +71,9 @@ export function ProductPage() {
     prepared = !!(balances && preview && isPrepared(balances, preview));
   const terms = quote ? quoteTerms(quote) : null,
     remaining = terms ? Math.max(0, Math.ceil(Number(terms.deadline) - now / 1000)) : 0;
-  const cutoff = !!series && now > Number(series.tradeCutoff) * 1000;
+  const cutoff = !!series && now >= Number(series.tradeCutoff) * 1000;
+  const readOnly = config.mode === 'testnet';
+  const timeZone = config.mode === 'demo' ? undefined : 'America/New_York';
   // Changing any order input invalidates both the visible quote and responses still in flight.
   useEffect(() => {
     operation.current++;
@@ -131,6 +159,7 @@ export function ProductPage() {
       setWalletOpen(true);
       return;
     }
+    if (readOnly) return;
     if (!prepared) {
       setMessage('');
       setDialog('assets');
@@ -160,9 +189,12 @@ export function ProductPage() {
               <div className="stock-avatar">N</div>
               <div>
                 <h2>
-                  NVDAx <span className="subtle-badge">xStocks</span>
+                  NVDAx{' '}
+                  <span className="subtle-badge">{config.mode === 'demo' ? 'xStocks' : 'Test asset'}</span>
                 </h2>
-                <p>NVIDIA · Tokenized stock</p>
+                <p>
+                  {config.mode === 'demo' ? 'NVIDIA · Tokenized stock' : 'NVIDIA strategy · tNVDAx / twNVDAx'}
+                </p>
               </div>
             </div>
             <span className="asset-tag">
@@ -256,22 +288,66 @@ export function ProductPage() {
             <h2>Create {isPut ? 'Buy Low' : 'Sell High'} order</h2>
             <span className="subtle-badge">NVDAx</span>
           </div>
-          <label className="field-label">
-            Choose a series <span>Fixed expiry</span>
-          </label>
-          <div className="tenor-options">
-            {available.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setSelectedSeries(s.id)}
-                className={s.id === series?.id ? 'selected' : ''}
-              >
-                <strong>{s.days} days</strong>
-                <small>{dateTime(s.exerciseEnd)} expiry</small>
-              </button>
-            ))}
-            {!available.length && <div className="skeleton" />}
+          {readOnly && (
+            <div className="notice availability-notice" role="status">
+              <strong>Quotes are not available yet.</strong>
+              <p>{QUOTES_UNAVAILABLE}</p>
+            </div>
+          )}
+          <div className="field-label" id="expiry-label">
+            Choose an expiry <span>{config.mode === 'demo' ? 'Fixed expiry' : 'New York time'}</span>
           </div>
+          <div className="tenor-options" role="group" aria-labelledby="expiry-label">
+            {expiries.map((end) => {
+              const s = available.find((s) => s.exerciseEnd === end)!;
+              const remainingDays = Math.ceil((Number(end) - now / 1000) / 86400);
+              return (
+                <button
+                  key={end}
+                  onClick={() => setSelectedExpiry(end)}
+                  aria-pressed={end === expiry}
+                  className={end === expiry ? 'selected' : ''}
+                >
+                  <strong>{config.mode === 'demo' ? `${s.days} days` : dateOnly(end, timeZone)}</strong>
+                  <small>
+                    {config.mode === 'demo'
+                      ? `${dateTime(end)} expiry`
+                      : `${remainingDays < 2 ? 'Less than 1 day' : `${remainingDays} days`} remaining`}
+                  </small>
+                </button>
+              );
+            })}
+            {!available.length &&
+              (loading ? (
+                <div className="skeleton" />
+              ) : (
+                <p className="muted">
+                  {error
+                    ? 'Series could not be loaded. Please reload.'
+                    : 'No series are open for new positions.'}
+                </p>
+              ))}
+          </div>
+          {pricedSeries.length > 0 && (
+            <>
+              <div className="field-label" id="strike-label">
+                Choose a target price <span>USDG per NVDAx equivalent</span>
+              </div>
+              <div className="strike-options" role="group" aria-labelledby="strike-label">
+                {pricedSeries.map((s) => (
+                  <button
+                    key={s.id}
+                    aria-pressed={s.id === series?.id}
+                    className={s.id === series?.id ? 'selected' : ''}
+                    onClick={() => setSelectedSeries(s.id)}
+                  >
+                    {market && amount(stockTarget(s, market.rate))}
+                    <small>USDG</small>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <div className="target-block">
             <div>
               <span className="field-label">
@@ -329,7 +405,7 @@ export function ProductPage() {
               <span>Exercise window</span>
               <span>
                 {series
-                  ? `${dateTime(series.exerciseStart)} · ${(Number(series.exerciseEnd) - Number(series.exerciseStart)) / 60} min`
+                  ? `${dateTime(series.exerciseStart, timeZone)} · ${(Number(series.exerciseEnd) - Number(series.exerciseStart)) / 60} min`
                   : '—'}
               </span>
             </div>
@@ -337,7 +413,7 @@ export function ProductPage() {
           {balances && (
             <div className="available-balance">
               <Icon name="wallet" size={14} />
-              Available:
+              Available:{' '}
               {isPut
                 ? `${amount(balances.usdg)} USDG`
                 : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
@@ -351,7 +427,7 @@ export function ProductPage() {
           <button
             className="button primary full main-cta"
             onClick={primary}
-            disabled={!!busy || !preview || cutoff}
+            disabled={!!busy || !preview || cutoff || (readOnly && !!connection)}
           >
             {busy ? (
               <>
@@ -362,17 +438,21 @@ export function ProductPage() {
               'Series closed to new positions'
             ) : !connection ? (
               'Connect to get started'
+            ) : readOnly ? (
+              'Quotes unavailable'
             ) : !prepared ? (
               'Prepare assets'
             ) : (
               'Get a quote'
             )}
-            {!busy && !cutoff && <Icon name="arrow" size={18} />}
+            {!busy && !cutoff && !(readOnly && connection) && <Icon name="arrow" size={18} />}
           </button>
           <p className="cta-note">
             {config.mode === 'demo'
               ? 'Demo quotes only · No real assets needed'
-              : 'Quotes requested directly from the gateway'}
+              : readOnly
+                ? 'Live testnet data · Trading is not enabled'
+                : 'Quotes requested directly from the gateway'}
           </p>
           {preview && (
             <details className="technical-details">
@@ -387,7 +467,17 @@ export function ProductPage() {
                 <dt>Current wrapping rate</dt>
                 <dd>1 wNVDAx = {market && precise(market.rate)} NVDAx</dd>
                 <dt>Trading cutoff</dt>
-                <dd>{dateTime(preview.series.tradeCutoff)}</dd>
+                <dd>{dateTime(preview.series.tradeCutoff, timeZone)}</dd>
+                <dt>Exercise ends</dt>
+                <dd>{dateTime(preview.series.exerciseEnd, timeZone)}</dd>
+                {readOnly && (
+                  <>
+                    <dt>Onchain series</dt>
+                    <dd>Series #{preview.series.id}</dd>
+                    <dt>Fixed price per wrapped token</dt>
+                    <dd>{precise(preview.series.strikePricePerWrappedUSDG, 6)} USDG</dd>
+                  </>
+                )}
               </dl>
               <p>
                 The reference target uses the current exchange rate. After opening, wrapped units and the
@@ -395,6 +485,19 @@ export function ProductPage() {
                 the wrapped tokens.
               </p>
             </details>
+          )}
+          {readOnly && market && (
+            <div className="deployment-links">
+              <a href={`${config.explorerUrl}/address/${config.nvdaVault}`} target="_blank" rel="noreferrer">
+                View Vault <Icon name="external" size={12} />
+              </a>
+              <a href={`${config.explorerUrl}/address/${market.exchange}`} target="_blank" rel="noreferrer">
+                View Exchange <Icon name="external" size={12} />
+              </a>
+              <button disabled={loading} onClick={() => void reload()}>
+                {loading ? 'Refreshing…' : 'Refresh onchain data'}
+              </button>
+            </div>
           )}
         </section>
       </div>

@@ -2,7 +2,7 @@
 
 Buy Low and Sell High strategies for tokenized stocks, with an upfront premium and fixed settlement terms.
 
-Payoff combines Solidity contracts, a shared signing and amount-conversion SDK, an independent RFQ gateway, and a Next.js product demo. The current frontend uses **simulated assets and fixed demo quotes**. Public testnet trading and a live dealer service are not connected yet.
+Payoff combines Solidity contracts, a shared signing and amount-conversion SDK, an independent RFQ gateway, and a Next.js frontend. The default frontend displays **real X Layer Testnet series and wallet balances**. Quotes, wallet transaction submission and position history are not connected yet. An explicit demo mode remains available for simulated end-to-end flows.
 
 ## Try the product
 
@@ -15,7 +15,7 @@ npm ci
 npm run dev:web
 ```
 
-Open [localhost:3000](http://localhost:3000), select **Connect to get started**, then **Use demo account**. Try both strategies, review a quote, open a simulated position, and explore exercise, expiry and claims. No wallet, VPS or real assets are required. Connecting a browser wallet still uses demo assets and never sends a transaction in this mode.
+Open [localhost:3000](http://localhost:3000) to browse deployed series by expiry and target price. Connect a browser wallet to read its testnet balances. The quote service is explicitly unavailable; no signatures or transactions are requested. For the isolated simulated trade flow, set `NEXT_PUBLIC_DATA_MODE=demo` in `web/.env.local` and restart the app.
 
 See the [frontend guide](web/README.md) for deployment settings and demo controls.
 
@@ -64,7 +64,9 @@ The wallet transaction path is implemented in the contracts and gateway; sending
 | [web/](web/README.md) | Next.js / React / TypeScript frontend |
 | [test/](test/) | Contract lifecycle, fuzz, invariant, SDK and asset fork tests |
 | [test/fixtures/](test/fixtures/) | Public deterministic quote vector and pinned fork data |
-| [config/xlayer.json](config/xlayer.json) | Public X Layer asset addresses and RPC defaults |
+| [config/xlayer.json](config/xlayer.json) | Public X Layer mainnet asset addresses and RPC defaults |
+| [config/xlayer-testnet.json](config/xlayer-testnet.json) | Public testnet deployment addresses and active catalog IDs |
+| [script/](script/README.md) | X Layer testnet deployment procedure and explicit test assets |
 
 ## Build and verify
 
@@ -105,4 +107,6 @@ Fork tests use block **70,938,201** and the real NVDAx, wNVDAx and USDG contract
 
 The [frontend guide](web/README.md) covers Vercel. The [gateway guide](gateway/README.md) includes a single-VPS Docker Compose setup, HTTPS proxy example and dealer API contract. Copy the example configuration files and supply your own deployment values. Internal notes, actual infrastructure configuration, local credentials and historical logs are excluded from this repository.
 
-Live dealer pricing, market data, hedging, automatic exercise, complete position indexing, public testnet integration and production deployment remain separate work. Demo prices, premiums and fees are test data. Contracts have no proxy upgrade path, administrator withdrawal, price oracle or corporate-action cash adjustment. This is an MVP implementation, not an audited production release.
+The [testnet deployment guide](script/README.md) covers chain 1952, encrypted-keystore signing, sample series, and test stock/wrapper assets. The frontend reads deployed Series 5–20 and wallet balances directly from testnet. The test stock and wrapper are not issuer-backed assets. Contract addresses and discovery IDs are public; operational notes and credentials remain excluded.
+
+Live dealer pricing, market data, hedging, automatic exercise, complete position indexing, testnet trading integration and production deployment remain separate work. Demo prices, premiums and fees are test data. Contracts have no proxy upgrade path, administrator withdrawal, price oracle or corporate-action cash adjustment. This is an MVP implementation, not an audited production release.

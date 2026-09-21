@@ -12,6 +12,7 @@ import type { Config } from './config';
 import type { AppQuote, Balances, Market, Preview } from './types';
 
 export const tokenAbi = parseAbi([
+  'function decimals() view returns(uint8)',
   'function balanceOf(address) view returns(uint256)',
   'function allowance(address,address) view returns(uint256)',
   'function approve(address,uint256) returns(bool)',
@@ -33,6 +34,8 @@ export const vaultAbi = parseAbi([
 ]);
 export const exchangeAbi = parseAbi([
   'function feeBps() view returns(uint16)',
+  'function usdg() view returns(address)',
+  'function vaultAllowed(address) view returns(bool)',
   'function fill((bytes32 requestId,address vault,address dealer,address taker,uint256 seriesId,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 grossPremiumUSDG,uint256 protocolFeeUSDG,uint256 netPremiumUSDG,uint64 issuedAt,uint64 deadline,uint256 nonce) quote,bytes signature,(uint256 minNetPremiumUSDG,uint256 maxCollateralUSDG,uint256 maxCollateralWrapped) limits) returns(uint256)',
 ]);
 export function chainConfig(config: Config) {
@@ -56,11 +59,12 @@ export async function readBalances(
   account: Address,
   market: Market,
   vault: Address,
+  client = publicClient(config),
 ): Promise<Balances> {
-  const client = publicClient(config),
-    blockNumber = await client.getBlockNumber();
+  const blockNumber = await client.getBlockNumber();
   const token = (address: Address) => ({ address, abi: tokenAbi, blockNumber }) as const;
-  const [usdg, stock, wrapped, usdgAllowance, wrappedAllowance] = await Promise.all([
+  const [okb, usdg, stock, wrapped, usdgAllowance, wrappedAllowance] = await Promise.all([
+    client.getBalance({ address: account, blockNumber }),
     client.readContract({ ...token(market.usdg), functionName: 'balanceOf', args: [account] }),
     client.readContract({ ...token(market.stock), functionName: 'balanceOf', args: [account] }),
     client.readContract({ ...token(market.wrappedStock), functionName: 'balanceOf', args: [account] }),
@@ -68,6 +72,7 @@ export async function readBalances(
     client.readContract({ ...token(market.wrappedStock), functionName: 'allowance', args: [account, vault] }),
   ]);
   return {
+    okb: String(okb),
     usdg: String(usdg),
     stock: String(stock),
     wrapped: String(wrapped),

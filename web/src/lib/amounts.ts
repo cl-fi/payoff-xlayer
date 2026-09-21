@@ -48,17 +48,20 @@ export function ratio(numerator: string, denominator: string) {
 export function stockTarget(series: ProductSeries, rate: string) {
   return ceilDiv(BigInt(series.strikePricePerWrappedUSDG) * WAD, BigInt(rate));
 }
-export function dateTime(seconds: string | number) {
+export function dateTime(seconds: string | number, timeZone?: string) {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    ...(timeZone ? { timeZone, timeZoneName: 'short' as const } : {}),
   }).format(Number(seconds) * 1000);
 }
-export function dateOnly(seconds: string | number) {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(Number(seconds) * 1000);
+export function dateOnly(seconds: string | number, timeZone?: string) {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone }).format(
+    Number(seconds) * 1000,
+  );
 }
 export function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;

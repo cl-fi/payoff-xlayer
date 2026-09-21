@@ -1,9 +1,9 @@
 import { UserFacingError } from '../errors';
-import { getAddress, type Address, type Hex } from 'viem';
+import type { Address, Hex } from 'viem';
 import { z } from 'zod';
 import { quoteSchema, address, hash, hex, uint } from '../../../../gateway/src/types';
-import { expectedFillData, exchangeAbi, publicClient, readBalances, vaultAbi, wrapperAbi } from '../chain';
-import { WAD } from '../amounts';
+import { expectedFillData, readBalances } from '../chain';
+import { readOnchainMarket } from './onchain';
 import type { Config } from '../config';
 import type {
   AppQuote,
@@ -95,66 +95,9 @@ export class GatewayAdapter implements ProductAdapter {
         markets: z.array(z.object({ vault: address, seriesIds: z.array(uint(256, true)) })).min(1),
       })
       .parse(await this.api('/v1/markets'));
-    const client = publicClient(this.config);
-    if ((await client.getChainId()) !== directory.chainId)
-      throw new UserFacingError('The RPC network does not match the gateway configuration.');
-    // The first frontend release presents one stock. More Vaults remain available at the API layer.
-    const listed = directory.markets.find((m) => same(m.vault, this.config.nvdaVault));
-    if (!listed)
-      throw new UserFacingError('The configured NVDAx Vault is not in the gateway product directory.');
-    const block = await client.getBlock();
-    const read = { address: listed.vault, abi: vaultAbi, blockNumber: block.number } as const;
-    const [wrappedStock, stock, usdg, exchange, feeBps] = await Promise.all([
-      client.readContract({ ...read, functionName: 'wrappedStock' }),
-      client.readContract({ ...read, functionName: 'stock' }),
-      client.readContract({ ...read, functionName: 'usdg' }),
-      client.readContract({ ...read, functionName: 'exchange' }),
-      client.readContract({
-        address: directory.exchange,
-        abi: exchangeAbi,
-        functionName: 'feeBps',
-        blockNumber: block.number,
-      }),
-    ]);
-    if (!same(usdg, directory.usdg) || !same(exchange, directory.exchange))
-      throw new UserFacingError('The Vault binding does not match the gateway configuration.');
-    const rate = await client.readContract({
-      address: wrappedStock,
-      abi: wrapperAbi,
-      functionName: 'convertToAssets',
-      args: [WAD],
-      blockNumber: block.number,
-    });
-    if (rate <= 0n) throw new UserFacingError('The wrapping exchange rate is unavailable.');
-    const series = await Promise.all(
-      listed.seriesIds.map(async (id) => {
-        const s = await client.readContract({ ...read, functionName: 'getSeries', args: [BigInt(id)] });
-        if (s.side !== 0 && s.side !== 1) throw new UserFacingError('Unsupported series side.');
-        return {
-          id,
-          side: s.side as 0 | 1,
-          vault: getAddress(listed.vault),
-          days: Math.max(0, Math.ceil(Number(s.exerciseEnd - block.timestamp) / 86400)),
-          label: `Series #${id}`,
-          strikePricePerWrappedUSDG: String(s.strikePricePerWrappedUSDG),
-          tradeCutoff: String(s.tradeCutoff),
-          exerciseStart: String(s.exerciseStart),
-          exerciseEnd: String(s.exerciseEnd),
-        };
-      }),
-    );
-    return {
-      chainId: directory.chainId,
-      exchange,
-      usdg,
-      stock,
-      wrappedStock,
-      rate: String(rate),
-      blockNumber: String(block.number),
-      feeBps,
-      series,
-    };
+    return readOnchainMarket(this.config, directory);
   }
+
   balances(account: Address, market: Market, vault: Address) {
     return readBalances(this.config, account, market, vault);
   }

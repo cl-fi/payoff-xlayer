@@ -599,6 +599,57 @@ summary:focus-visible {
   border-color: var(--teal);
   color: var(--teal);
 }
+.strike-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.strike-options button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 10px 6px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.strike-options button.selected {
+  border-color: var(--teal);
+  background: #f1f8f4;
+  color: var(--teal);
+}
+.strike-options small {
+  display: block;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.availability-notice {
+  margin-bottom: 22px;
+}
+.availability-notice p {
+  margin: 6px 0 0;
+}
+.deployment-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  margin-top: 16px;
+  color: var(--teal);
+}
+.deployment-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.deployment-links button {
+  padding: 0;
+  background: none;
+  color: inherit;
+  border: none;
+  font: inherit;
+}
 .target-block {
   display: flex;
   align-items: center;
@@ -2323,5 +2374,33 @@ input[type='checkbox'] {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.testnet-balance-content {
+  padding: 0 24px 24px;
+}
+.testnet-assets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  padding: 28px 0;
+}
+.testnet-assets > div {
+  display: grid;
+  gap: 12px;
+}
+.testnet-assets span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.testnet-assets strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .testnet-assets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

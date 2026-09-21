@@ -8,6 +8,7 @@ import { DemoAdapter, claimAmounts, positionStatus } from '@/lib/data/demo';
 import { amount, dateTime, precise, WAD } from '@/lib/amounts';
 import { friendlyError } from '@/lib/wallet';
 import type { Position } from '@/lib/types';
+import { TestnetPortfolio } from './testnet-portfolio';
 
 const labels = {
   open: 'Open',
@@ -16,6 +17,10 @@ const labels = {
   claimed: 'Claimed',
 };
 export function PositionsPage() {
+  const { config } = useProduct();
+  return config.mode === 'testnet' ? <TestnetPortfolio /> : <TradingPositions />;
+}
+function TradingPositions() {
   const {
     positions,
     balances,

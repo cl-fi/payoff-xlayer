@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { Icon, Mark } from '@/components/icon';
+import { getConfig } from '@/lib/config';
 
 export default function HowItWorks() {
+  const demo = getConfig().mode === 'demo';
   return (
     <div className="page guide-page">
       <section className="page-intro">
@@ -101,11 +103,15 @@ export default function HowItWorks() {
       </section>
       <div className="guide-end">
         <div>
-          <h2>Try the full flow with a small order.</h2>
-          <p>The demo includes local assets, fixed quotes and simulated settlement outcomes.</p>
+          <h2>{demo ? 'Try the full flow with a small order.' : 'Explore the deployed strategies.'}</h2>
+          <p>
+            {demo
+              ? 'The demo includes local assets, fixed quotes and simulated settlement outcomes.'
+              : 'View onchain terms and wallet balances on X Layer Testnet. Quotes and trading are not available yet. tNVDAx and twNVDAx are test tokens, not issuer-backed stocks.'}
+          </p>
         </div>
         <Link href="/" className="button primary">
-          Try the demo <Icon name="arrow" size={17} />
+          {demo ? 'Try the demo' : 'Explore products'} <Icon name="arrow" size={17} />
         </Link>
       </div>
     </div>
