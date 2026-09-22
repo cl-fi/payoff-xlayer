@@ -84,6 +84,7 @@ npm run build:gateway
 npm run test:gateway
 npm run test:dealer
 npm run test:gateway:integration
+npm run test:integration --workspace @payoff/self-dealer
 npm run test:web
 npm run build:web
 npm run test:web:e2e
@@ -94,6 +95,7 @@ Foundry is pinned through npm; no global installation is needed. Contracts use S
 - Contract tests cover both strategies, quote validation, lifecycle transitions, fuzz cases and multi-market accounting invariants.
 - SDK checks compare a committed EIP-712 vector with Solidity and exercise integer rounding and wrapped-asset conversions.
 - Gateway tests cover dealer transport, selection, persistent idempotency and receipt verification. Local EVM integration deploys the actual Exchange and Vault with test assets on Anvil. Database tests use PGlite locally unless `TEST_DATABASE_URL` is set; CI uses PostgreSQL 17.
+- Dealer settlement tests cover manual exercise, inventory/allowance checks, transaction recovery and all four claim outcomes. The VPS runs a read-only monitor; see [manual settlement operations](dealer/SETTLEMENT.md).
 - Frontend tests cover both strategies and settlement outcomes, quote expiry, account changes, demo isolation, and desktop/mobile layouts. See the [frontend guide](web/README.md#verification) for browser prerequisites.
 
 Optional checks requiring an X Layer RPC:

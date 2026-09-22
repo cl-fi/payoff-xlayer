@@ -5,6 +5,8 @@ import { ThetaProvider } from './theta.mjs';
 import { LastValidBidProvider } from './market.mjs';
 import { buildDealerApp } from './app.mjs';
 import { ReferenceService } from './reference.mjs';
+import { SettlementChain } from './settlement-chain.mjs';
+import { SettlementMonitor } from './settlement.mjs';
 
 async function main() {
   const { config, privateKey, token, rpcUrl } = await loadConfig();
@@ -18,10 +20,15 @@ async function main() {
   const reference = new ReferenceService({ config, chain, provider,
     catalogPath: process.env.DEALER_CATALOG_PATH ?? '/var/lib/payoff-dealer/catalog.json',
     bundledPath: new URL('../../web/public/catalog.json', import.meta.url) });
-  const app = await buildDealerApp({ config, account, chain, provider, token, reference, logger: true });
+  const settlement = new SettlementMonitor({ config, chain: new SettlementChain(config, rpcUrl, account.address),
+    path: process.env.DEALER_SETTLEMENT_PATH ?? '/var/lib/payoff-dealer/settlement.json' });
+  const app = await buildDealerApp({ config, account, chain, provider, token, reference, settlement, logger: true });
   reference.log = data => app.log.info(data, 'reference pricing');
-  app.addHook('onClose', async () => { await reference.stop(); await provider.close(); });
+  settlement.log = data => data.event === 'settlement_scan_failed' || data.alerts?.length
+    ? app.log.warn(data, 'manual settlement attention') : app.log.info(data, 'manual settlement status');
+  app.addHook('onClose', async () => { await Promise.all([reference.stop(), settlement.stop()]); await provider.close(); });
   reference.start();
+  await settlement.start();
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void app.close(); });
   try { await app.listen({ host: process.env.HOST ?? '127.0.0.1', port: Number(process.env.PORT ?? 8081) }); }
   catch (error) { await app.close(); throw error; }

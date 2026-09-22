@@ -6,6 +6,8 @@
   "engines": { "node": ">=24" },
   "scripts": {
     "start": "node src/main.mjs",
+    "settlement": "node src/settlement-cli.mjs",
+    "test:integration": "node --test test/integration/*.test.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

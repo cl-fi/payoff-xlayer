@@ -133,7 +133,7 @@ Playwright starts a development server on port 3100 and tests desktop and mobile
 
 ## Remaining operational work
 
-- Dealer exercise is not automated. Opening a quote only checks the premium budget; exercise needs the appropriate delivery assets and Vault allowances during the exercise window. Otherwise the position expires without exercise and the user reclaims collateral.
+- Dealer exercise is deliberately manual. A VPS monitor checks all owned positions, windows, delivery inventory and Vault allowances; an operator previews and executes individual transactions with the [settlement CLI](../dealer/SETTLEMENT.md). Quotes only check the premium budget. Expiry without exercise remains a valid outcome; users claim their own collateral.
 - The catalog currently ends on October 2, 2026. New series and dealer contract mappings need to be scheduled before existing batches close.
 - New testers need OKB, USDG and/or owner-minted test stock. There is no integrated stock faucet or wrapped-stock redemption UI; claims deliver the contract-specified token, including wrapped stock.
 - Position history currently scans paginated RPC logs from the deployment block. A backend index is needed as history grows. Pending transaction recovery handles observed receipts and replacements while the page is open; a replacement made while the page is closed may require manual wallet/explorer reconciliation.

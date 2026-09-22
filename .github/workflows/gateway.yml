@@ -33,6 +33,7 @@ jobs:
       - run: npm run test:dealer
       - run: python3 -m unittest discover -s dealer/test -p '*_test.py'
       - run: npm run test:gateway:integration
+      - run: npm run test:integration --workspace @payoff/self-dealer
       - run: npm run test:sdk
       - run: docker build -f gateway/Dockerfile -t payoff-rfq-gateway:ci .
       - run: docker build -f dealer/Dockerfile -t payoff-self-dealer:ci .

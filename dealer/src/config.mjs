@@ -21,6 +21,10 @@ export const configSchema = z.strictObject({
   catalogUrl: z.url().default('https://www.payoff.finance/catalog.json'),
   catalogRefreshMs: z.number().int().positive().default(300000),
   referenceIntervalMs: z.number().int().positive().default(30000),
+  settlementIntervalMs: z.number().int().min(1000).default(60000),
+  settlementWarningSeconds: z.number().int().positive().default(86400),
+  settlementConfirmations: z.number().int().min(1).max(20).default(2),
+  settlementMinGasWei: uint.default('100000000000000'),
 }).superRefine((c, ctx) => {
   if (new Set(c.markets.map(m => m.vault.toLowerCase())).size !== c.markets.length)
     ctx.addIssue({ code: 'custom', message: 'Duplicate Vault.' });

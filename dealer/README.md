@@ -2,6 +2,11 @@
 
 A separate Node.js process implements the gateway's existing dealer HTTP protocol. It reads option NBBO from ThetaData, retains each contract's last valid bid for 24/7 pricing, and signs EIP-712 v2 quotes with the shared `sdk/quotes.mjs`. The gateway still owns collection, ranking, funding validation and fill simulation; it has no pricing key or market-data credential.
 
+The process also runs a read-only settlement monitor. Operators preview and
+explicitly execute individual exercises using a private CLI; there is no automatic
+exercise policy. See [manual settlement operations](SETTLEMENT.md) for funding,
+allowances, alerts, transaction recovery and commands.
+
 ## Public reference module
 
 `src/reference.mjs` runs in this same process, with separate responsibilities from formal `/quote` requests. It reads the static frontend `/catalog.json` on startup and every `catalogRefreshMs` (default 5 minutes). It keeps the last valid catalog in the dealer volume, with a bundled catalog for initial deployment. Neither browsing nor formal RFQs waits on that website. Wrong-chain catalogs are rejected.
