@@ -360,6 +360,60 @@ summary:focus-visible {
   color: var(--muted);
   white-space: nowrap;
 }
+.nvda-chart {
+  margin: 0 28px 24px;
+  min-width: 0;
+}
+.nvda-chart-label,
+.nvda-chart-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.nvda-chart-label {
+  margin-bottom: 12px;
+}
+.nvda-chart-label span:last-child {
+  color: var(--ink);
+  font-weight: 600;
+}
+.nvda-chart-frame {
+  position: relative;
+  height: 320px;
+}
+.nvda-chart-host,
+.nvda-chart-host .tradingview-widget-container,
+.nvda-chart-host .tradingview-widget-container__widget {
+  width: 100%;
+  height: 100%;
+}
+.nvda-chart-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--white);
+  color: var(--muted);
+  font-size: 12px;
+}
+.nvda-chart-status a,
+.nvda-chart-caption a {
+  color: var(--teal);
+}
+.nvda-chart-status a:hover,
+.nvda-chart-caption a:hover {
+  text-decoration: underline;
+}
+.nvda-chart-caption {
+  margin-top: 10px;
+}
 .strategy-tabs {
   margin: 0 28px;
   padding: 5px;
@@ -1722,6 +1776,7 @@ input[type='checkbox'] {
     padding-left: 21px;
     padding-right: 21px;
   }
+  .nvda-chart,
   .strategy-tabs {
     margin-left: 21px;
     margin-right: 21px;
@@ -1850,6 +1905,10 @@ input[type='checkbox'] {
   }
   .asset-header {
     padding: 23px 26px;
+  }
+  .nvda-chart {
+    margin-left: 26px;
+    margin-right: 26px;
   }
   .asset-tag {
     display: flex;
@@ -2072,6 +2131,13 @@ input[type='checkbox'] {
   }
   .asset-header {
     padding: 20px;
+  }
+  .nvda-chart {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+  .nvda-chart-frame {
+    height: 290px;
   }
   .stock-avatar {
     width: 41px;

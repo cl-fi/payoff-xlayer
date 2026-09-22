@@ -13,6 +13,7 @@ import { GatewayAdapter } from '@/lib/data/gateway';
 import { TradingWallet } from '@/lib/transactions';
 import { UserFacingError } from '@/lib/errors';
 import { referenceEstimate } from '@/lib/data/reference';
+import { NvidiaPriceChart } from './nvidia-price-chart';
 
 export function ProductPage() {
   const {
@@ -238,6 +239,7 @@ export function ProductPage() {
               {config.mode === 'demo' ? 'Demo product' : 'Testnet product'}
             </span>
           </div>
+          <NvidiaPriceChart />
           <div className="strategy-tabs" role="tablist" aria-label="Strategy">
             <button
               role="tab"
