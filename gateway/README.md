@@ -61,6 +61,12 @@ The transport requires successful JSON responses, rejects redirects, bounds resp
 
 Amount conversion and signing reuse the root `sdk/` modules.
 
+## Public reference snapshots
+
+`GET /v1/reference-quotes` is wallet-free and reads a precomputed snapshot from the configured `referenceSource`. It does not create an RFQ, validate taker funding, sign quotes, rank makers or query an options provider. The self-dealer process currently hosts the reference module; this source is configured independently of the competitive dealer list. A source failure returns `503 REFERENCE_UNAVAILABLE` without affecting normal RFQ endpoints.
+
+Set `referenceSource.url` to the private `http://self-dealer:8081/reference-quotes`, `allowHttp: true`, and `bearerTokenEnv: SELF_DEALER_API_TOKEN` for the included Compose deployment. Public browser requests need no bearer token. The frontend product catalog is the static file published with the website, not `/v1/markets`; the latter remains available for execution-admission discovery and compatibility.
+
 ## Build and test
 
 From the repository root with Node.js 24:

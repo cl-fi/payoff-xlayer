@@ -19,6 +19,11 @@
     }
   ],
   "allowedOrigins": ["https://REPLACE_WITH_FRONTEND_DOMAIN"],
+  "referenceSource": {
+    "url": "http://self-dealer:8081/reference-quotes",
+    "allowHttp": true,
+    "bearerTokenEnv": "SELF_DEALER_API_TOKEN"
+  },
   "trustedProxies": [],
   "collectMs": 800,
   "rpcTimeoutMs": 3000,

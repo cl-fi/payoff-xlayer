@@ -4,6 +4,7 @@ import { DealerChain } from './chain.mjs';
 import { ThetaProvider } from './theta.mjs';
 import { LastValidBidProvider } from './market.mjs';
 import { buildDealerApp } from './app.mjs';
+import { ReferenceService } from './reference.mjs';
 
 async function main() {
   const { config, privateKey, token, rpcUrl } = await loadConfig();
@@ -14,8 +15,13 @@ async function main() {
   let provider;
   try { provider = await LastValidBidProvider.open(upstream, process.env.DEALER_BID_CACHE_PATH ?? 'data/last-valid-bids.json'); }
   catch (error) { upstream.close(); throw error; }
-  const app = await buildDealerApp({ config, account, chain, provider, token, logger: true });
-  app.addHook('onClose', async () => provider.close());
+  const reference = new ReferenceService({ config, chain, provider,
+    catalogPath: process.env.DEALER_CATALOG_PATH ?? '/var/lib/payoff-dealer/catalog.json',
+    bundledPath: new URL('../../web/public/catalog.json', import.meta.url) });
+  const app = await buildDealerApp({ config, account, chain, provider, token, reference, logger: true });
+  reference.log = data => app.log.info(data, 'reference pricing');
+  app.addHook('onClose', async () => { await reference.stop(); await provider.close(); });
+  reference.start();
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { void app.close(); });
   try { await app.listen({ host: process.env.HOST ?? '127.0.0.1', port: Number(process.env.PORT ?? 8081) }); }
   catch (error) { await app.close(); throw error; }

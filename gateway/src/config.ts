@@ -18,6 +18,12 @@ export const configSchema = z.strictObject({
   rpcUrlEnv: z.string().default('XLAYER_RPC_URL'),
   markets: z.array(z.strictObject({ vault: address, seriesIds: z.array(uint(256, true)).min(1) })),
   dealers: z.array(dealerSchema), allowedOrigins: z.array(z.url()).default([]),
+  referenceSource: z.strictObject({ url: z.url(), bearerTokenEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/), allowHttp: z.boolean().default(false) })
+    .superRefine((s, ctx) => {
+      const u = new URL(s.url);
+      if (u.username || u.password || u.hash || u.search || (u.protocol !== 'https:' && !(s.allowHttp && u.protocol === 'http:')))
+        ctx.addIssue({ code: 'custom', message: 'Reference source must use HTTPS or explicitly trusted internal HTTP.' });
+    }).optional(),
   trustedProxies: z.array(z.string()).default([]),
   collectMs: z.number().int().min(10).max(60000).default(800),
   rpcTimeoutMs: z.number().int().min(100).max(60000).default(3000),
@@ -33,7 +39,7 @@ export const configSchema = z.strictObject({
   if (c.collectMs >= c.requestTimeoutMs) ctx.addIssue({ code: 'custom', message: 'Collection timeout must be shorter than the whole RFQ timeout.' });
 });
 export type Config = z.infer<typeof configSchema>;
-export type Runtime = { config: Config; rpcUrl: string; databaseUrl: string; dealerTokens: Map<string, string> };
+export type Runtime = { config: Config; rpcUrl: string; databaseUrl: string; dealerTokens: Map<string, string>; referenceToken?: string };
 export async function loadRuntime(env: NodeJS.ProcessEnv = process.env): Promise<Runtime> {
   const config = configSchema.parse(JSON.parse(await readFile(env.GATEWAY_CONFIG_PATH ?? 'config.local.json', 'utf8')));
   const rpcUrl = env[config.rpcUrlEnv];
@@ -49,5 +55,7 @@ export async function loadRuntime(env: NodeJS.ProcessEnv = process.env): Promise
       dealerTokens.set(d.id, value);
     }
   }
-  return { config, rpcUrl, databaseUrl, dealerTokens };
+  const referenceToken = config.referenceSource ? env[config.referenceSource.bearerTokenEnv] : undefined;
+  if (config.referenceSource && !referenceToken) throw new Error('Missing reference service credential.');
+  return { config, rpcUrl, databaseUrl, dealerTokens, referenceToken };
 }

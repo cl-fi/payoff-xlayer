@@ -2,8 +2,10 @@ import { UserFacingError } from '../errors';
 import type { Address, Hex } from 'viem';
 import { z } from 'zod';
 import { quoteSchema, address, hash, hex, uint } from '../../../../gateway/src/types';
-import { expectedFillData, readBalances } from '../chain';
+import { expectedFillData, publicClient, readBalances } from '../chain';
 import { readOnchainMarket } from './onchain';
+import { staticMarket } from './catalog';
+import { referenceSnapshotSchema, sameTerms } from '../../../../sdk/catalog.mjs';
 import type { Config } from '../config';
 import type {
   AppQuote,
@@ -65,6 +67,7 @@ export class GatewayAdapter implements ProductAdapter {
   constructor(
     readonly config: Config,
     private fetcher: typeof fetch = (...args) => fetch(...args),
+    private client = publicClient(config),
   ) {}
   private async api(path: string, body?: unknown, key?: string) {
     const response = await this.fetcher(this.config.gatewayUrl + path, {
@@ -82,22 +85,42 @@ export class GatewayAdapter implements ProductAdapter {
     return result;
   }
   async market(): Promise<Market> {
-    const directory = z
-      .object({
-        chainId: z.literal(1952),
-        exchange: address,
-        usdg: address,
-        markets: z.array(z.object({ vault: address, seriesIds: z.array(uint(256, true)) })).min(1),
-      })
-      .parse(await this.api('/v1/markets'));
-    return readOnchainMarket(this.config, directory);
+    return staticMarket(this.config);
+  }
+  async references() {
+    const snapshot = referenceSnapshotSchema.parse(await this.api('/v1/reference-quotes'));
+    const market = staticMarket(this.config);
+    if (snapshot.chainId !== market.chainId || !same(snapshot.exchange, market.exchange))
+      throw new UserFacingError('Reference prices do not match this network.');
+    return snapshot;
+  }
+  async selectedMarket(preview: Preview): Promise<Market> {
+    const published = staticMarket(this.config);
+    const market = await readOnchainMarket(
+      this.config,
+      {
+        chainId: published.chainId,
+        exchange: published.exchange,
+        usdg: published.usdg,
+        markets: [{ vault: preview.order.vault, seriesIds: [preview.order.seriesId] }],
+      },
+      this.client,
+      published,
+    );
+    if (!sameTerms(market.series[0], preview.series))
+      throw new UserFacingError('The published product terms changed. Reload before trading.');
+    if (market.rate !== preview.rate)
+      throw new UserFacingError(
+        'The wrapping rate changed. Wait for the reference update and review your quantity again.',
+      );
+    return market;
   }
 
   balances(account: Address, market: Market, vault: Address) {
     return readBalances(this.config, account, market, vault);
   }
   async quote(preview: Preview, key: string): Promise<GatewayQuote | null> {
-    const market = await this.market();
+    const market = await this.selectedMarket(preview);
     let response = await this.api('/v1/rfqs', preview.order, key);
     const start = Date.now();
     while (response.status === 'collecting' && Date.now() - start < 25000) {

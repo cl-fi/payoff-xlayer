@@ -3,12 +3,13 @@ import { RpcChain } from './chain.js';
 import { Gateway } from './gateway.js';
 import { buildApp } from './app.js';
 import { database } from './database.js';
+import { fetchReference } from './reference.js';
 
 async function main() {
   const runtime = await loadRuntime();
   const { pool, store } = database(runtime.databaseUrl);
   const gateway = new Gateway(runtime.config, new RpcChain(runtime.config, runtime.rpcUrl), store, runtime.dealerTokens);
-  const app = await buildApp(gateway, true);
+  const app = await buildApp(gateway, true, () => fetchReference(runtime.config, runtime.referenceToken));
   app.addHook('onClose', async () => { await pool.end(); });
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => { void app.close(); });
   try {

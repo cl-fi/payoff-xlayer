@@ -748,6 +748,19 @@ summary:focus-visible {
 .order-summary strong {
   font-size: 12px;
 }
+.reference-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: -4px 0 16px;
+}
+.reference-note p {
+  margin: 4px 0;
+}
+.order-summary [data-testid='reference-premium'] {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .available-balance {
   font-size: 10px;
   color: var(--muted);

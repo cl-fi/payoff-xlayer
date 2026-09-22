@@ -2,7 +2,17 @@
 
 A separate Node.js process implements the gateway's existing dealer HTTP protocol. It reads option NBBO from ThetaData, retains each contract's last valid bid for 24/7 pricing, and signs EIP-712 v2 quotes with the shared `sdk/quotes.mjs`. The gateway still owns collection, ranking, funding validation and fill simulation; it has no pricing key or market-data credential.
 
-## Pricing rule
+## Public reference module
+
+`src/reference.mjs` runs in this same process, with separate responsibilities from formal `/quote` requests. It reads the static frontend `/catalog.json` on startup and every `catalogRefreshMs` (default 5 minutes). It keeps the last valid catalog in the dealer volume, with a bundled catalog for initial deployment. Neither browsing nor formal RFQs waits on that website. Wrong-chain catalogs are rejected.
+
+Every `referenceIntervalMs` (default 30 seconds), it reads mutable chain inputs once per active Vault, then prices the published Series with the shared exact-option matching, last-valid-bid provider and premium calculation. Two background workers leave capacity for formal inquiries. Cycles cannot overlap. There are no taker balances, approvals, maker-funding checks, nonce creation or signatures in this path.
+
+`GET /reference-quotes` returns the already computed snapshot to the authenticated gateway. It includes per-wrapped-token net premiums, rate/fee snapshots, original market observation times, calculation times and per-Series availability. The gateway exposes it publicly at `/v1/reference-quotes`. Missing data for one option does not suppress other options. A closed Series is removed on refresh and also filtered by the frontend clock. The 50% policy is configurable platform reference pricing, not a limit on competing dealers.
+
+The snapshot is rebuilt in memory; the underlying last-valid bids and catalog survive restarts in `/var/lib/payoff-dealer`. `reference_refreshed` logs counts, and `reference_catalog_fallback` reports a catalog fetch failure without logging credentials. Configure `DEALER_CATALOG_PATH` for local development if the default volume path is unavailable.
+
+## Formal pricing rule
 
 Buy Low sells a put; Sell High sells a call. Match the configured underlying symbol, the series expiry date in New York and the exact stock-equivalent strike. There is no nearest-strike or nearest-expiry fallback.
 

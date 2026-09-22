@@ -13,7 +13,17 @@ npm run dev:web
 
 Open [localhost:3000](http://localhost:3000). Browse the fixed expiry dates and target prices, then connect a browser wallet. Buy Low approves the required test USDG; Sell High wraps only the missing stock quantity and approves wrapped collateral. Request a quote, review the terms and confirm the trade in your wallet. You need test OKB for gas and sufficient collateral.
 
-The public [deployment catalog](../config/xlayer-testnet.json) supplies contract addresses and discovery IDs 5–20. Every series term, token binding, fee and wrapping rate is verified from the RPC at one block. The page excludes series whose trading cutoff has passed, and displays dates in New York time. Prices are contract strikes converted at the current wrapping rate, not live stock prices. Old sample series 1–4 remain onchain but are excluded from this catalog.
+The [deployment configuration](../config/xlayer-testnet.json) supplies addresses and discovery IDs. Run `npm run catalog:generate` after creating series to read and verify their chain terms and asset bindings, then commit [public/catalog.json](public/catalog.json) and deploy the frontend. Gateway mode imports this static catalog into its initial page; browsing products needs no browser RPC or directory Function. `/catalog.json` serves the same file for the VPS reference service. Ordinary builds need no RPC. Updating the catalog requires a frontend deployment.
+
+The catalog records a wrapping-rate/fee snapshot for initial display. Public references refresh those mutable values; formal inquiries verify the selected Series, current rate and fee from the chain again. The page excludes series whose cutoff has passed and displays dates in New York time. Target prices are contract strikes converted to native-stock equivalents, not live stock prices. Explicit read-only `testnet` mode retains direct chain discovery for diagnostics.
+
+## Public reference prices
+
+Browsers call `GET https://api.payoff.finance/v1/reference-quotes` immediately and poll every 30 seconds without a wallet. The VPS reference module generates estimates independently of those requests, using the self-dealer's market-data provider and pricing functions. The gateway distributes the snapshot; Vercel does not relay RFQs or reference requests.
+
+Each reference is normalized to one wrapped token, net of protocol fees. The browser scales by the user's wrapped quantity using integer arithmetic. Small rounding differences and quantity-dependent maker pricing can make formal quotes differ. Term yield is net premium divided by USDG collateral for Buy Low, or the agreed sale proceeds for Sell High; it is not annualized or a return based on the stock's live market value.
+
+The UI shows the original market timestamp and distinguishes live from last-valid bids. A calculation timestamp never makes an old observation fresh. Unavailable contracts are isolated; provider outages can use the persisted last valid bid for the exact option. Reference-service failures retain the last displayed estimate with a delayed-update notice. Catalog, references, balances, receipt recovery and history load independently; connecting a wallet never clears products.
 
 The assets tNVDAx and twNVDAx are deployment test tokens, not issuer-backed stocks. USDG is the test token distributed by the OKX faucet. **My positions** recovers positions from Exchange events and Vault state, including series no longer in the active catalog. Eligible positions can be claimed after dealer exercise or expiry. Clearing browser storage does not remove onchain positions. An RPC error clears unavailable data and never falls back to a simulated balance or quote.
 
@@ -48,7 +58,9 @@ Demo records live in browser localStorage, separately for each account. Clearing
 | `src/lib/activity.ts`                  | Pending transaction journal and receipt recovery             |
 | `src/lib/data/positions.ts`            | Paginated event discovery and authoritative Vault reads      |
 | `src/lib/data/demo.ts`                 | Fixed quotes and local simulated balances                    |
-| `src/lib/data/gateway.ts`              | Browser-to-VPS HTTP adapter                                  |
+| `src/lib/data/gateway.ts`              | Browser-to-VPS adapter and selected-series verification      |
+| `src/lib/data/catalog.ts`              | Static published product directory                           |
+| `src/lib/data/reference.ts`            | Reference estimates and observation freshness                |
 | `src/lib/data/testnet.ts`              | Public deployment discovery; quotes explicitly unavailable   |
 | `src/lib/data/onchain.ts`              | Shared verified onchain market reads for testnet and gateway |
 | `src/components/testnet-portfolio.tsx` | Real testnet wallet balances and position-history status     |
@@ -57,7 +69,7 @@ Pages access products through `ProductAdapter`. Quote types and Zod schemas reus
 
 `DemoQuote` and `GatewayQuote` are separate types. Demo quotes have `null` signatures and transactions, and the real gateway adapter and transaction encoder reject them. Only gateway mode can use the real wallet transaction sender. Explicit `testnet` mode remains read-only.
 
-The gateway adapter implements market discovery, onchain series/balance reads, quote polling, preparation and receipt queries, with order, fee, target-contract and calldata validation. Before a fill, the adapter rechecks the selected quote; the wallet sender simulates the exact transaction and waits for two confirmations. Approvals request the needed amount when the existing allowance is insufficient. Submitted hashes survive a page reload; Check status reconciles them with chain receipts. A receipt-reporting outage does not erase a successful onchain fill.
+The gateway adapter uses the static directory for browsing, and verifies only the selected Series before a formal inquiry. Quote polling, preparation and receipt queries validate the order, fee, target contract and calldata. Before a fill, the adapter rechecks the selected quote; the wallet sender simulates the exact transaction and waits for two confirmations. Approvals request the needed amount when the existing allowance is insufficient. Submitted hashes survive a page reload; Check status reconciles them with chain receipts. A receipt-reporting outage does not erase a successful onchain fill.
 
 ## Amounts and settlement
 
@@ -85,10 +97,11 @@ The repository includes [vercel.json](vercel.json):
 
 ```text
 Browser → Vercel / Next.js: load the website
-Browser → VPS RFQ gateway: request and prepare quotes
+Browser → VPS RFQ gateway: read public references; request and prepare formal quotes
 Gateway → self-operated and other whitelisted dealers: collect offers
 Browser → wallet → X Layer contracts: approve, wrap, fill and claim
-Browser → X Layer RPC: read market, balances, positions and receipts
+Browser → X Layer RPC: verify selected trade; read balances, positions and receipts
+VPS reference module → Vercel /catalog.json: periodically read published products
 ```
 
 RFQ traffic goes directly to the gateway. There is no Next.js RFQ proxy or demo serverless function. Other independent web features can use Route Handlers when needed.
@@ -124,7 +137,7 @@ Playwright starts a development server on port 3100 and tests desktop and mobile
 - The catalog currently ends on October 2, 2026. New series and dealer contract mappings need to be scheduled before existing batches close.
 - New testers need OKB, USDG and/or owner-minted test stock. There is no integrated stock faucet or wrapped-stock redemption UI; claims deliver the contract-specified token, including wrapped stock.
 - Position history currently scans paginated RPC logs from the deployment block. A backend index is needed as history grows. Pending transaction recovery handles observed receipts and replacements while the page is open; a replacement made while the page is closed may require manual wallet/explorer reconciliation.
-- The quote notice explains use of the last valid bid, but the dealer market-data timestamp is not yet exposed per quote to the frontend.
+- Public references expose the original market observation time. Formal signed RFQ records do not yet include separate market-data metadata; they remain independent of the display estimate.
 - There is one admitted self-operated dealer. Quote checks do not reserve funds. No hedging, automatic market-maker competition guarantees or mainnet rollout is implied.
 - Monitor dealer balances, provider health, quote failures and series expiry. Add alerts and verify logical database backup/restore.
 - Gateway CORS must include each frontend origin. Production and localhost:3000 are allowed; arbitrary Vercel preview origins are not enabled automatically.

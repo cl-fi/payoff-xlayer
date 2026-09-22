@@ -9,6 +9,25 @@ import { GatewayError } from '../src/errors.js';
 import { configSchema } from '../src/config.js';
 import { orderSchema } from '../src/types.js';
 import { config, db, dealer, dealerServer, fakeChain, json, makerA, makerB, order, signed, txHash, vault } from './helpers.js';
+import type { ReferenceSnapshot } from '../../sdk/catalog.mjs';
+
+test('public references bypass taker checks and maker collection; failures are isolated from the gateway', async t => {
+  const database = await db(); t.after(database.close);
+  const chain = fakeChain();
+  chain.snapshot = async () => { throw new Error('References must not query taker state'); };
+  const gateway = new Gateway(config([]), chain, database.store);
+  let fail = false;
+  const snapshot = { version: 1, chainId: 1952, exchange: gateway.config.exchange, updatedAtMs: Date.now(),
+    catalogGeneratedAt: new Date().toISOString(), refreshIntervalMs: 30000, maxQuoteAgeMs: 30000, markets: [], quotes: [] } as ReferenceSnapshot;
+  const app = await buildApp(gateway, false, async () => { if (fail) throw new Error('Private provider credential'); return snapshot; });
+  t.after(() => app.close());
+  const response = await app.inject({ method: 'GET', url: '/v1/reference-quotes' });
+  assert.equal(response.statusCode, 200); assert.deepEqual(response.json(), snapshot);
+  fail = true;
+  const unavailable = await app.inject({ method: 'GET', url: '/v1/reference-quotes' });
+  assert.equal(unavailable.statusCode, 503); assert.ok(!unavailable.body.includes('credential'));
+  assert.equal((await app.inject({ method: 'GET', url: '/healthz' })).statusCode, 200);
+});
 
 test('parallel HTTP fanout selects highest net premium; one failed dealer does not block others', async t => {
   const database = await db(); t.after(database.close);

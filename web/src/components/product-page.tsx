@@ -12,6 +12,7 @@ import { friendlyError, switchNetwork } from '@/lib/wallet';
 import { GatewayAdapter } from '@/lib/data/gateway';
 import { TradingWallet } from '@/lib/transactions';
 import { UserFacingError } from '@/lib/errors';
+import { referenceEstimate } from '@/lib/data/reference';
 
 export function ProductPage() {
   const {
@@ -27,6 +28,9 @@ export function ProductPage() {
     loading,
     error,
     activity,
+    references,
+    referenceError,
+    balancesError,
   } = useProduct();
   const [side, setSide] = useState<0 | 1>(0),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
@@ -73,6 +77,7 @@ export function ProductPage() {
   }, [quantity, series, market, connection?.address]);
   const preview = calculation.preview,
     prepared = !!(balances && preview && isPrepared(balances, preview));
+  const estimate = referenceEstimate(references, preview, now);
   const terms = quote ? quoteTerms(quote) : null,
     remaining = terms ? Math.max(0, Math.ceil(Number(terms.deadline) - now / 1000)) : 0;
   const cutoff = !!series && now >= Number(series.tradeCutoff) * 1000;
@@ -88,7 +93,7 @@ export function ProductPage() {
     setAccepted(false);
     setMessage('');
     setBusy('');
-  }, [quantity, side, series?.id, connection?.address, scenario, revision]);
+  }, [quantity, side, series?.id, market?.rate, connection?.address, scenario, revision]);
   useEffect(
     () => () => {
       operation.current++;
@@ -343,7 +348,9 @@ export function ProductPage() {
                   <small>
                     {config.mode === 'demo'
                       ? `${dateTime(end)} expiry`
-                      : `${remainingDays < 2 ? 'Less than 1 day' : `${remainingDays} days`} remaining`}
+                      : now
+                        ? `${remainingDays < 2 ? 'Less than 1 day' : `${remainingDays} days`} remaining`
+                        : 'Fixed expiry'}
                   </small>
                 </button>
               );
@@ -429,9 +436,25 @@ export function ProductPage() {
               </strong>
             </div>
             <div>
-              <span>Net premium</span>
-              <span className="muted">Available after quoting</span>
+              <span>{config.mode === 'gateway' ? 'Estimated net premium' : 'Net premium'}</span>
+              <strong data-testid="reference-premium">
+                {config.mode !== 'gateway'
+                  ? 'Available after quoting'
+                  : estimate
+                    ? `${amount(estimate.netPremiumUSDG, 6, 6)} USDG`
+                    : !references && !referenceError
+                      ? 'Loading reference…'
+                      : 'Temporarily unavailable'}
+              </strong>
             </div>
+            {config.mode === 'gateway' && (
+              <div>
+                <span>Estimated term yield</span>
+                <strong data-testid="reference-yield">
+                  {estimate && preview ? `${ratio(estimate.netPremiumUSDG, preview.strikeAmountUSDG)}%` : '—'}
+                </strong>
+              </div>
+            )}
             <div>
               <span>Exercise window</span>
               <span>
@@ -441,6 +464,32 @@ export function ProductPage() {
               </span>
             </div>
           </div>
+          {config.mode === 'gateway' && (
+            <div className="reference-note" role="status">
+              <p>Reference estimate · Final premium is confirmed in your trade quote.</p>
+              {estimate && (
+                <>
+                  <p>
+                    {estimate.live ? 'Live market bid' : 'Last valid market bid'} ·{' '}
+                    {dateTime(estimate.quote.marketTimestampMs / 1000, 'America/New_York')}
+                  </p>
+                  <p>
+                    Term yield = net premium ÷ {isPut ? 'USDG collateral' : 'agreed sale amount'}. Not
+                    annualized.
+                  </p>
+                  {(estimate.delayed || referenceError) && (
+                    <p>Updates delayed. Showing the last available reference.</p>
+                  )}
+                </>
+              )}
+              {!estimate && referenceError && <p>{referenceError}</p>}
+            </div>
+          )}
+          {balancesError && (
+            <div className="notice" role="status">
+              {balancesError}
+            </div>
+          )}
           {balances && (
             <div className="available-balance">
               <Icon name="wallet" size={14} />

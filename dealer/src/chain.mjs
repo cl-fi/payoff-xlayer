@@ -53,4 +53,28 @@ export class DealerChain {
     const [balance, allowance] = await Promise.all([read('balanceOf', [this.dealer]), read('allowance', [this.dealer, this.config.exchange])]);
     if (balance < BigInt(gross) || allowance < BigInt(gross)) throw new NoQuote('DEALER_UNFUNDED');
   }
+  // Public estimates need no maker/taker balance, allowance or signature. Read shared
+  // mutable inputs once per Vault, using the published catalog for immutable terms.
+  async referenceMarket(market) {
+    const c = this.config;
+    const known = c.markets.find(m => same(m.vault, market.vault));
+    if (!known || !same(known.stock, market.stock) || !same(known.wrappedStock, market.wrappedStock))
+      throw new NoQuote('MARKET_CONFIGURATION');
+    const block = await this.client.getBlock({ blockTag: 'latest' });
+    const now = BigInt(Math.floor(Date.now() / 1000));
+    if (block.timestamp + BigInt(c.maxBlockAgeSeconds) < now || block.timestamp > now + 1n) throw new NoQuote('STALE_CHAIN');
+    const read = (address, abi, functionName, args = []) => this.client.readContract({ address, abi, functionName, args, blockNumber: block.number });
+    const [rate, feeBps, asset, exchange, usdg, stock, wrapped, allowed, paused, vaultPaused] = await Promise.all([
+      read(market.wrappedStock, tokenAbi, 'convertToAssets', [10n ** 18n]), read(c.exchange, exchangeAbi, 'feeBps'),
+      read(market.wrappedStock, tokenAbi, 'asset'), read(market.vault, vaultAbi, 'exchange'),
+      read(market.vault, vaultAbi, 'usdg'), read(market.vault, vaultAbi, 'stock'), read(market.vault, vaultAbi, 'wrappedStock'),
+      read(c.exchange, exchangeAbi, 'vaultAllowed', [market.vault]), read(c.exchange, exchangeAbi, 'newPositionsPaused'),
+      read(market.vault, vaultAbi, 'newPositionsPaused'),
+    ]);
+    if (!same(asset, market.stock) || !same(exchange, c.exchange) || !same(usdg, c.usdg)
+      || !same(stock, market.stock) || !same(wrapped, market.wrappedStock) || rate <= 0n)
+      throw new NoQuote('MARKET_CONFIGURATION');
+    if (!allowed || paused || vaultPaused) throw new NoQuote('MARKET_UNAVAILABLE');
+    return { vault: market.vault, rate: rate.toString(), feeBps, blockNumber: block.number.toString(), observedAtMs: Date.now() };
+  }
 }

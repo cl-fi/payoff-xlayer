@@ -12,6 +12,7 @@ RUN npm ci --omit=dev --ignore-scripts --workspace @payoff/self-dealer && npm ca
 COPY sdk sdk
 COPY dealer/src dealer/src
 COPY dealer/theta dealer/theta
+COPY web/public/catalog.json web/public/catalog.json
 RUN chmod -R a+rX /app && mkdir -p /var/lib/payoff-dealer && chown node:node /var/lib/payoff-dealer
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=8081 THETA_PYTHON=/opt/theta/bin/python
 USER node

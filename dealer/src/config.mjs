@@ -18,6 +18,9 @@ export const configSchema = z.strictObject({
   maxBlockAgeSeconds: z.number().int().positive().default(60),
   rpcTimeoutMs: z.number().int().positive().default(5000),
   dataTimeoutMs: z.number().int().min(500).max(30000).default(7000),
+  catalogUrl: z.url().default('https://www.payoff.finance/catalog.json'),
+  catalogRefreshMs: z.number().int().positive().default(300000),
+  referenceIntervalMs: z.number().int().positive().default(30000),
 }).superRefine((c, ctx) => {
   if (new Set(c.markets.map(m => m.vault.toLowerCase())).size !== c.markets.length)
     ctx.addIssue({ code: 'custom', message: 'Duplicate Vault.' });

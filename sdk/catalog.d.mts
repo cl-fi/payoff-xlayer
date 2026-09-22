@@ -1,0 +1,22 @@
+import type { Address } from 'viem';
+import type { z } from 'zod';
+export type CatalogTerms = { side: 0 | 1; strikePricePerWrappedUSDG: string; tradeCutoff: string; exerciseStart: string; exerciseEnd: string };
+export type Catalog = {
+  version: 1; chainId: number; exchange: Address; usdg: Address; generatedAt: string; blockNumber: string; feeBps: number;
+  markets: { vault: Address; stock: Address; wrappedStock: Address; symbol: string; rate: string;
+    series: (CatalogTerms & { id: string; label: string })[] }[];
+};
+type ReferenceBase = { vault: Address; seriesId: string; terms: CatalogTerms };
+export type ReferenceQuote = ReferenceBase & ({ status: 'available'; netPremiumPerWrappedUSDG: string; assetsPerWrapped: string;
+  calculatedAtMs: number; marketTimestampMs: number; marketOpenMs: number; marketCloseMs: number; expirationCloseMs: number;
+  marketDataMode: 'live' | 'last_valid'; option: { symbol: string; expiration: string; right: 'put' | 'call'; strikeMilli: string };
+} | { status: 'unavailable'; reason: string });
+export type ReferenceSnapshot = { version: 1; chainId: number; exchange: Address; updatedAtMs: number; catalogGeneratedAt: string;
+  refreshIntervalMs: number; maxQuoteAgeMs: number;
+  markets: { vault: Address; rate: string; feeBps: number; blockNumber: string; observedAtMs: number }[];
+  quotes: ReferenceQuote[];
+};
+export const catalogSchema: z.ZodType<Catalog>;
+export const termsSchema: z.ZodType<CatalogTerms>;
+export const referenceSnapshotSchema: z.ZodType<ReferenceSnapshot>;
+export function sameTerms(a: CatalogTerms, b: CatalogTerms): boolean;

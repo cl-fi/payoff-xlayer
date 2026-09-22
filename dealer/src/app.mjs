@@ -15,13 +15,19 @@ const requestSchema = z.strictObject({
   // The dealer obtains authoritative terms from the chain, never trusts the supplied snapshot.
   snapshot: z.object({}).passthrough(), collectUntil: z.iso.datetime(),
 });
-export async function buildDealerApp({ config, chain, provider, account, token, logger = false }) {
+export async function buildDealerApp({ config, chain, provider, account, token, reference, logger = false }) {
   const app = Fastify({ logger: logger ? { level: 'info', redact: ['req.headers.authorization'] } : false, bodyLimit: 16384 });
   const credential = Buffer.from(`Bearer ${token}`);
   let active = 0;
   app.addHook('onSend', async (_req, reply, body) => { reply.header('cache-control', 'no-store'); return body; });
   app.setErrorHandler((_error, _req, reply) => reply.code(400).send({ error: 'INVALID_REQUEST' }));
   app.get('/healthz', async () => ({ status: 'ok' }));
+  app.get('/reference-quotes', async (req, reply) => {
+    const supplied = Buffer.from(req.headers.authorization ?? '');
+    if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return reply.code(401).send({ error: 'UNAUTHORIZED' });
+    if (!reference?.snapshot) return reply.code(503).send({ error: 'REFERENCE_UNAVAILABLE' });
+    return reference.snapshot;
+  });
   app.get('/readyz', async (_req, reply) => {
     try {
       if (!provider.ready) throw new Error('Market data unavailable');

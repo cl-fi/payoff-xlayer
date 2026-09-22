@@ -5,9 +5,10 @@ import { z } from 'zod';
 import { asGatewayError, within } from './errors.js';
 import { Gateway, publicRecord } from './gateway.js';
 import { hash, orderSchema } from './types.js';
+import type { ReferenceSnapshot } from '../../sdk/catalog.mjs';
 
 const keySchema = z.string().min(16).max(128).regex(/^[a-zA-Z0-9_.:-]+$/);
-export async function buildApp(gateway: Gateway, logger = false) {
+export async function buildApp(gateway: Gateway, logger = false, reference?: () => Promise<ReferenceSnapshot>) {
   const app = Fastify({ logger: logger ? { level: 'info', redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.idempotency-key'] } : false,
     bodyLimit: 16384, trustProxy: gateway.config.trustedProxies.length ? gateway.config.trustedProxies : false,
     requestTimeout: gateway.config.requestTimeoutMs + 15000 });
@@ -32,6 +33,12 @@ export async function buildApp(gateway: Gateway, logger = false) {
   });
   app.get('/v1/markets', async () => ({ chainId: gateway.config.chainId, exchange: gateway.config.exchange,
     usdg: gateway.config.usdg, markets: gateway.config.markets, quantityUnit: 'wrapped-token-base-units', wrappedDecimals: 18, usdgDecimals: 6 }));
+  app.get('/v1/reference-quotes', async (_request, reply) => {
+    try {
+      if (!reference) throw new Error('Reference source unavailable');
+      return await reference();
+    } catch { return reply.code(503).send({ error: { code: 'REFERENCE_UNAVAILABLE', message: 'Reference prices are temporarily unavailable.' } }); }
+  });
   app.post('/v1/rfqs', async (request, reply) => {
     const key = keySchema.parse(request.headers['idempotency-key']);
     const order = orderSchema.parse(request.body);

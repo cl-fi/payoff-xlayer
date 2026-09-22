@@ -32,7 +32,7 @@ function TradingPositions() {
     reload,
     config,
     revision,
-    loading,
+    positionsLoading: loading,
     positionsError,
     activity,
   } = useProduct();

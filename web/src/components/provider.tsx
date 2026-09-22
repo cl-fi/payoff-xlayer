@@ -14,6 +14,8 @@ import { getConfig, type Config } from '@/lib/config';
 import { DEMO_ACCOUNT, DemoAdapter, STORAGE_PREFIX, initialDemoState } from '@/lib/data/demo';
 import { GatewayAdapter } from '@/lib/data/gateway';
 import { TestnetAdapter } from '@/lib/data/testnet';
+import { staticMarket } from '@/lib/data/catalog';
+import type { ReferenceSnapshot } from '../../../sdk/catalog.mjs';
 import type { Balances, Market, Position, ProductAdapter, Scenario } from '@/lib/types';
 import {
   connectWallet,
@@ -36,6 +38,10 @@ type ContextValue = {
   balances: Balances | null;
   positions: Position[];
   positionsError: string;
+  positionsLoading: boolean;
+  balancesError: string;
+  references: ReferenceSnapshot | null;
+  referenceError: string;
   activity: Activity[];
   connection: Connection | null;
   loading: boolean;
@@ -60,10 +66,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [config] = useState(getConfig);
   const [adapter, setAdapter] = useState<ProductAdapter | null>(null);
   const [connection, setConnection] = useState<Connection | null>(null);
-  const [market, setMarket] = useState<Market | null>(null),
+  const [market, setMarket] = useState<Market | null>(() =>
+      config.mode === 'gateway' ? staticMarket(config) : null,
+    ),
     [balances, setBalances] = useState<Balances | null>(null),
     [positions, setPositions] = useState<Position[]>([]);
   const [positionsError, setPositionsError] = useState('');
+  const [positionsLoading, setPositionsLoading] = useState(false);
+  const [balancesError, setBalancesError] = useState('');
+  const [references, setReferences] = useState<ReferenceSnapshot | null>(null);
+  const [referenceError, setReferenceError] = useState('');
   const [activity, setActivity] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
@@ -90,14 +102,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? new TestnetAdapter(config)
           : new GatewayAdapter(config),
     );
-    setMarket(null);
+    if (config.mode !== 'gateway') setMarket(null);
+  }, [config, config.mode === 'demo' ? currentAccount : null]);
+  useEffect(() => {
+    generation.current++;
     setBalances(null);
+    setBalancesError('');
     setPositions([]);
     setPositionsError('');
     setActivity([]);
     setError('');
     setRevision((v) => v + 1);
-  }, [config, currentAccount]);
+  }, [config, connection]);
+  useEffect(() => {
+    if (!(adapter instanceof GatewayAdapter)) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try {
+        const snapshot = await adapter.references();
+        if (cancelled) return;
+        setReferences(snapshot);
+        setReferenceError('');
+        const input = snapshot.markets.find((m) => m.vault.toLowerCase() === config.nvdaVault.toLowerCase());
+        if (input)
+          setMarket((m) =>
+            m ? { ...m, rate: input.rate, feeBps: input.feeBps, blockNumber: input.blockNumber } : m,
+          );
+      } catch {
+        if (!cancelled) setReferenceError('Reference updates are temporarily unavailable.');
+      } finally {
+        if (!cancelled) timer = setTimeout(() => void refresh(), 30000);
+      }
+    };
+    void refresh();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [adapter, config]);
   const reload = useCallback(async () => {
     if (
       !adapter ||
@@ -107,30 +150,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     const req = ++request.current;
     const gen = generation.current;
+    const current = () => gen === generation.current && req === request.current;
     setLoading(true);
     try {
       const m = await adapter.market();
-      const b =
-        connection && m.series[0] ? await adapter.balances(connection.address, m, m.series[0].vault) : null;
-      let p: Position[] = [];
-      let historyError = '';
-      let transactions: Activity[] = [];
-      if (connection && adapter instanceof DemoAdapter) p = adapter.state().positions;
+      if (!current()) return;
+      setMarket((previous) =>
+        adapter instanceof GatewayAdapter && previous
+          ? { ...m, rate: previous.rate, feeBps: previous.feeBps, blockNumber: previous.blockNumber }
+          : m,
+      );
+      setLoading(false);
+      setError('');
+      if (connection && adapter instanceof DemoAdapter) setPositions(adapter.state().positions);
       if (connection && adapter instanceof GatewayAdapter) {
-        transactions = await recoverActivity(localStorage, config, connection.address);
-        try {
-          p = await readPositions(config, connection.address, m);
-        } catch {
-          historyError = 'Position history could not be loaded from the chain. Refresh to try again.';
+        setPositionsLoading(true);
+        // History and receipt recovery must never delay catalog, balances or the trade dialog.
+        void readPositions(config, connection.address, m)
+          .then((p) => {
+            if (current()) {
+              setPositions(p);
+              setPositionsError('');
+            }
+          })
+          .catch(() => {
+            if (current())
+              setPositionsError('Position history could not be loaded from the chain. Refresh to try again.');
+          })
+          .finally(() => {
+            if (current()) setPositionsLoading(false);
+          });
+        void recoverActivity(localStorage, config, connection.address)
+          .then((transactions) => {
+            if (current()) setActivity(transactions);
+          })
+          .catch(() => {
+            if (current())
+              setError(
+                'Saved transaction status could not be read. Check your wallet activity before trading.',
+              );
+          });
+      } else setPositionsLoading(false);
+      try {
+        const b =
+          connection && m.series[0] ? await adapter.balances(connection.address, m, m.series[0].vault) : null;
+        if (current()) {
+          setBalances(b);
+          setBalancesError('');
         }
-      }
-      if (gen === generation.current && req === request.current) {
-        setMarket(m);
-        setBalances(b);
-        setPositions(p);
-        setPositionsError(historyError);
-        setActivity(transactions);
-        setError('');
+      } catch {
+        if (current()) {
+          setBalances(null);
+          setBalancesError('Wallet balances could not be loaded. Refresh to try again.');
+        }
       }
     } catch (e) {
       if (gen === generation.current && req === request.current) {
@@ -244,6 +316,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       balances,
       positions,
       positionsError,
+      positionsLoading,
+      balancesError,
+      references,
+      referenceError,
       activity,
       connection,
       loading,
@@ -265,6 +341,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       balances,
       positions,
       positionsError,
+      positionsLoading,
+      balancesError,
+      references,
+      referenceError,
       activity,
       connection,
       loading,

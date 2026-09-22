@@ -12,6 +12,7 @@
     "fmt": "node scripts/forge.mjs fmt",
     "fmt:check": "node scripts/forge.mjs fmt --check",
     "probe:assets": "node scripts/probe-assets.mjs",
+    "catalog:generate": "tsx scripts/generate-catalog.mts",
     "build:gateway": "npm run build --workspace @payoff/rfq-gateway",
     "test:gateway": "npm test --workspace @payoff/rfq-gateway",
     "test:gateway:integration": "npm run test:integration --workspace @payoff/rfq-gateway",
