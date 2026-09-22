@@ -10,6 +10,11 @@ broadcast/
 gateway/dist/
 gateway/config.local.json
 gateway/.env
+gateway/deploy/dealer.env
+dealer/config.local.json
+dealer/.venv/
+dealer/data/
+__pycache__/
 web/.next/
 web/next-env.d.ts
 web/tsconfig.tsbuildinfo

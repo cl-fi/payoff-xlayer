@@ -8,7 +8,12 @@ broadcast/
 .DS_Store
 gateway/dist/
 gateway/config.local.json
+dealer/config.local.json
+dealer/.venv/
+dealer/data/
+__pycache__/
 gateway/.env
+gateway/deploy/dealer.env
 web/.next/
 web/next-env.d.ts
 web/tsconfig.tsbuildinfo

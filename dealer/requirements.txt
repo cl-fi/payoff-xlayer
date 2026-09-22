@@ -1,0 +1,8 @@
+thetadata==1.0.10
+python-dotenv==1.2.3
+grpcio==1.84.0
+httpx==0.28.1
+pandas==3.0.6
+polars==1.44.2
+protobuf==7.36.2
+zstandard==0.25.0

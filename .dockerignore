@@ -4,6 +4,10 @@ node_modules
 **/dist
 **/.env
 **/.env.*
+**/dealer.env
+**/.venv
+dealer/data
+**/__pycache__
 **/config.local.json
 out
 cache

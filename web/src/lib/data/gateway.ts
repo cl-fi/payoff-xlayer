@@ -64,7 +64,7 @@ export class GatewayAdapter implements ProductAdapter {
   private context = new Map<string, { preview: Preview; market: Market }>();
   constructor(
     readonly config: Config,
-    private fetcher: typeof fetch = fetch,
+    private fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
   private async api(path: string, body?: unknown, key?: string) {
     const response = await this.fetcher(this.config.gatewayUrl + path, {
@@ -75,15 +75,10 @@ export class GatewayAdapter implements ProductAdapter {
         ...(key ? { 'Idempotency-Key': key } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(25000),
+      signal: AbortSignal.timeout(35000),
     });
     const result = await response.json();
-    if (!response.ok)
-      throw new Error(
-        typeof result?.error?.message === 'string'
-          ? result.error.message
-          : 'The quote service is unavailable. Please try again later.',
-      );
+    if (!response.ok) throw new UserFacingError(gatewayError(result?.error?.code));
     return result;
   }
   async market(): Promise<Market> {
@@ -112,7 +107,7 @@ export class GatewayAdapter implements ProductAdapter {
     }
     if (response.status === 'no_quote') return null;
     if (response.status !== 'quoted')
-      throw new Error(response.error?.message ?? 'No valid quote was received. Please request a new quote.');
+      throw new UserFacingError('No valid quote was received. Please request a new quote.');
     const selection = selectionSchema.parse(response.selection),
       quote = validateSelection(selection, preview, market);
     this.context.set(quote.requestId, { preview, market });
@@ -124,6 +119,8 @@ export class GatewayAdapter implements ProductAdapter {
     const context = this.context.get(quote.requestId);
     if (!context) throw new UserFacingError('The order context has expired. Please request a new quote.');
     const response = await this.api(`/v1/rfqs/${quote.requestId}/prepare`, {});
+    if (response.status !== 'ready')
+      throw new UserFacingError('This quote is no longer executable. Request a new quote.');
     const checked = validateSelection(
       selectionSchema.parse(response.selection),
       context.preview,
@@ -148,4 +145,19 @@ export class GatewayAdapter implements ProductAdapter {
       })
       .parse(await this.api(`/v1/rfqs/${hash.parse(requestId)}/transactions`, { transactionHash }));
   }
+}
+function gatewayError(code: unknown) {
+  const messages: Record<string, string> = {
+    TAKER_BALANCE: 'Insufficient collateral. Reduce the quantity or fund your wallet.',
+    TAKER_ALLOWANCE: 'Approve the required collateral before requesting a quote.',
+    QUOTE_EXPIRED: 'The quote expired. Request a new quote.',
+    NONCE_UNAVAILABLE: 'This quote has already been used or cancelled. Request a new quote.',
+    DEALER_BALANCE: 'The dealer cannot fund this quote now. Try a smaller quantity or request a new quote.',
+    DEALER_ALLOWANCE: 'The dealer cannot execute this quote now. Request a new quote.',
+    SIMULATION_REVERTED:
+      'The trade cannot execute with the current balances or terms. Refresh and request a new quote.',
+  };
+  return (
+    messages[String(code)] ?? 'The quote service could not complete this request. Refresh and try again.'
+  );
 }

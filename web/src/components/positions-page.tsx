@@ -9,6 +9,7 @@ import { amount, dateTime, precise, WAD } from '@/lib/amounts';
 import { friendlyError } from '@/lib/wallet';
 import type { Position } from '@/lib/types';
 import { TestnetPortfolio } from './testnet-portfolio';
+import { TradingWallet } from '@/lib/transactions';
 
 const labels = {
   open: 'Open',
@@ -32,6 +33,8 @@ function TradingPositions() {
     config,
     revision,
     loading,
+    positionsError,
+    activity,
   } = useProduct();
   const [filter, setFilter] = useState('all'),
     [selected, setSelected] = useState<string | null>(null),
@@ -66,17 +69,23 @@ function TradingPositions() {
     return filter === 'all' || (filter === 'ready' ? ['exercised', 'expired'].includes(s) : s === filter);
   });
   async function claim(p: Position) {
-    if (!(adapter instanceof DemoAdapter)) return;
+    if (!adapter || !connection) return;
     setBusy(true);
     setMessage('');
     try {
-      await adapter.claim(p.id);
+      if (adapter instanceof DemoAdapter) await adapter.claim(p.id);
+      else await new TradingWallet(config, connection, localStorage, setMessage).claim(p);
       await reload();
-      setMessage('Assets claimed to your demo account.');
+      setMessage(
+        config.mode === 'demo'
+          ? 'Assets claimed to your demo account.'
+          : 'Claim confirmed. Assets have been returned to your wallet.',
+      );
     } catch (e) {
       setMessage(friendlyError(e));
     } finally {
       setBusy(false);
+      if (config.mode === 'gateway') void reload();
     }
   }
   async function simulate(outcome: 'exercised' | 'expired') {
@@ -111,21 +120,21 @@ function TradingPositions() {
         <div>
           <span>Total net premiums</span>
           <strong className="teal-text">
-            {amount(earned)} <small>USDG</small>
+            {positionsError || loading ? '—' : amount(earned, 6, 6)} <small>USDG</small>
           </strong>
           <p>Collected at opening</p>
         </div>
         <div>
           <span>Open · Locked USDG</span>
           <strong>
-            {amount(lockedUSDG)} <small>USDG</small>
+            {positionsError || loading ? '—' : amount(lockedUSDG)} <small>USDG</small>
           </strong>
           <p>Buy Low collateral</p>
         </div>
         <div>
           <span>Open · Locked wrapped stocks</span>
           <strong>
-            {amount(lockedWrapped, 18, 6)} <small>wNVDAx</small>
+            {positionsError || loading ? '—' : amount(lockedWrapped, 18, 6)} <small>wNVDAx</small>
           </strong>
           <p>Sell High collateral</p>
         </div>
@@ -158,7 +167,13 @@ function TradingPositions() {
             <Icon name="refresh" size={17} />
           </button>
         </div>
-        {!connection ? (
+        {positionsError ? (
+          <div className="notice error" role="alert">
+            {positionsError}
+          </div>
+        ) : loading ? (
+          <p className="muted">Loading positions…</p>
+        ) : !connection ? (
           <div className="empty-state">
             <div className="empty-icon">
               <Icon name="wallet" size={32} />
@@ -262,8 +277,8 @@ function TradingPositions() {
       )}
       {config.mode === 'gateway' && (
         <p className="fine-print">
-          This version shows positions saved in this browser. Full history indexing and onchain actions will
-          follow during integration.
+          Positions are recovered from onchain records for this wallet, including orders opened in another
+          browser.
         </p>
       )}
       <Modal
@@ -344,14 +359,20 @@ function TradingPositions() {
                 </p>
                 <button
                   className="button primary full"
-                  disabled={busy || config.mode !== 'demo'}
+                  disabled={
+                    busy ||
+                    activity.some((tx) => tx.status === 'pending') ||
+                    (connection?.kind === 'wallet' && connection.chainId !== config.chainId)
+                  }
                   onClick={() => void claim(position)}
                 >
                   {busy
-                    ? 'Simulating claim…'
+                    ? config.mode === 'demo'
+                      ? 'Simulating claim…'
+                      : 'Waiting for wallet confirmation…'
                     : config.mode === 'demo'
                       ? 'Claim demo assets'
-                      : 'Testnet claims coming soon'}
+                      : 'Claim assets in wallet'}
                 </button>
               </div>
             )}

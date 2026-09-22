@@ -22,6 +22,8 @@ export const wrapperAbi = parseAbi([
   'function convertToAssets(uint256) view returns(uint256)',
   'function convertToShares(uint256) view returns(uint256)',
   'function deposit(uint256,address) returns(uint256)',
+  'function previewMint(uint256) view returns(uint256)',
+  'function mint(uint256,address) returns(uint256)',
 ]);
 export const vaultAbi = parseAbi([
   'function wrappedStock() view returns(address)',
@@ -31,7 +33,12 @@ export const vaultAbi = parseAbi([
   'function getSeries(uint256) view returns((uint8 side,uint256 strikePricePerWrappedUSDG,uint64 tradeCutoff,uint64 exerciseStart,uint64 exerciseEnd))',
   'function position(uint256) view returns((uint256 seriesId,address shortHolder,address longHolder,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 wrappedBalance,uint8 state))',
   'function claim(uint256)',
+  'function nextPositionId() view returns(uint256)',
+  'function stateOf(uint256) view returns(uint8)',
 ]);
+export const fillEvent = parseAbi([
+  'event QuoteFilled(bytes32 indexed requestId,address indexed vault,uint256 indexed positionId,bytes32 quoteHash,address dealer,address taker,uint256 nonce,uint256 grossPremiumUSDG,uint256 protocolFeeUSDG,uint256 netPremiumUSDG)',
+])[0];
 export const exchangeAbi = parseAbi([
   'function feeBps() view returns(uint16)',
   'function usdg() view returns(address)',

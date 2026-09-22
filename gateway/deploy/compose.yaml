@@ -38,17 +38,22 @@ services:
     <<: *gateway-image
     restart: unless-stopped
     init: true
-    env_file: .env
     environment:
       DATABASE_URL: postgresql://payoff:${POSTGRES_PASSWORD}@postgres:5432/payoff
       GATEWAY_CONFIG_PATH: /run/payoff/config.json
+      XLAYER_RPC_URL: ${XLAYER_RPC_URL:?Set the deployed chain RPC}
+      SELF_DEALER_API_TOKEN: ${SELF_DEALER_API_TOKEN:?Set the shared dealer token}
       HOST: 0.0.0.0
       NODE_ENV: production
     volumes:
       - ../config.local.json:/run/payoff/config.json:ro
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
-    networks: [database, dealers]
+    networks:
+      database:
+      dealers:
+      edge:
+        ipv4_address: 172.30.0.2
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,11 +66,57 @@ services:
       retries: 3
     stop_grace_period: 45s
 
+  self-dealer:
+    image: payoff-self-dealer:local
+    build:
+      context: ../..
+      dockerfile: dealer/Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file: dealer.env
+    environment:
+      DEALER_CONFIG_PATH: /run/payoff/config.json
+      DEALER_BID_CACHE_PATH: /var/lib/payoff-dealer/last-valid-bids.json
+      XLAYER_RPC_URL: ${XLAYER_RPC_URL:?Set the deployed chain RPC}
+      SELF_DEALER_API_TOKEN: ${SELF_DEALER_API_TOKEN:?Set the shared dealer token}
+    volumes:
+      - ../../dealer/config.local.json:/run/payoff/config.json:ro
+      - dealer_data:/var/lib/payoff-dealer
+    networks: [dealers]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8081/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 45s
+      retries: 3
+
+  proxy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    environment:
+      GATEWAY_SITE: ${GATEWAY_SITE:?Set an API domain or http://server-ip for initial IP deployment}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports: ["80:80", "443:443"]
+    networks:
+      edge:
+        ipv4_address: 172.30.0.3
+    depends_on: [gateway]
+
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
+  dealer_data:
 
 networks:
   database:
     internal: true
   dealers:
     name: payoff_dealers
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/28

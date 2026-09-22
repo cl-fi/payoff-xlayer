@@ -3,7 +3,8 @@ import { Icon, Mark } from '@/components/icon';
 import { getConfig } from '@/lib/config';
 
 export default function HowItWorks() {
-  const demo = getConfig().mode === 'demo';
+  const mode = getConfig().mode;
+  const demo = mode === 'demo';
   return (
     <div className="page guide-page">
       <section className="page-intro">
@@ -107,7 +108,9 @@ export default function HowItWorks() {
           <p>
             {demo
               ? 'The demo includes local assets, fixed quotes and simulated settlement outcomes.'
-              : 'View onchain terms and wallet balances on X Layer Testnet. Quotes and trading are not available yet. tNVDAx and twNVDAx are test tokens, not issuer-backed stocks.'}
+              : mode === 'testnet'
+                ? 'View onchain terms and wallet balances on X Layer Testnet. Quotes and trading are not available yet. tNVDAx and twNVDAx are test tokens, not issuer-backed stocks.'
+                : 'Use your wallet to prepare collateral, review a dealer quote and open a position on X Layer Testnet. Quotes are available 24/7 and can use the last valid option bid during market closures. tNVDAx and twNVDAx are test tokens, not issuer-backed stocks.'}
           </p>
         </div>
         <Link href="/" className="button primary">

@@ -9,7 +9,8 @@ import { shortAddress } from '@/lib/amounts';
 import type { Scenario } from '@/lib/types';
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { config, connection, setWalletOpen, scenario, setScenario, resetDemo, error, reload } = useProduct();
+  const { config, connection, setWalletOpen, scenario, setScenario, resetDemo, error, reload, activity } =
+    useProduct();
   const pathname = usePathname(),
     [settings, setSettings] = useState(false),
     [resetting, setResetting] = useState(false);
@@ -37,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }) {
             ? 'Fixed test quotes · Simulated assets and trades. No onchain transactions.'
             : config.mode === 'testnet'
               ? 'Onchain series and wallet balances · Quote service not connected.'
-              : 'Test assets only · Trading integration in progress.'}
+              : 'Test assets · 24/7 dealer quotes · Wallet-confirmed trades.'}
         </span>
       </div>
       <header className="site-header">
@@ -86,6 +87,27 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main id="main">
+        {config.mode === 'gateway' && activity.some((tx) => tx.status === 'pending') && (
+          <div className="global-alert" role="status">
+            <Icon name="clock" />
+            <span>
+              Transaction submitted. Waiting for confirmation.{' '}
+              {activity
+                .filter((tx) => tx.status === 'pending')
+                .map((tx) => (
+                  <a
+                    key={tx.hash}
+                    href={`${config.explorerUrl}/tx/${tx.hash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {tx.label} ↗{' '}
+                  </a>
+                ))}
+            </span>
+            <button onClick={() => void reload()}>Check status</button>
+          </div>
+        )}
         {config.mode !== 'demo' && connection?.kind === 'wallet' && connection.chainId !== config.chainId && (
           <div className="global-alert" role="status">
             <Icon name="info" />

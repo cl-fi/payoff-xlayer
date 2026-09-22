@@ -53,7 +53,7 @@ export type Position = {
   wrappedQuantity: string;
   strikeAmountUSDG: string;
   netPremiumUSDG: string;
-  entryRate: string;
+  entryRate?: string;
   openedAt: number;
   status: PositionStatus;
   outcome?: 'exercised' | 'expired';

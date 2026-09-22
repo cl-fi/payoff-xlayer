@@ -1,6 +1,6 @@
 # Payoff frontend
 
-A Next.js App Router / React / TypeScript frontend for Buy Low and Sell High strategies. The default mode reads deployed contracts on X Layer Testnet (1952), with desktop and mobile layouts. It needs no VPS to display onchain data. Quotes and trading remain unavailable until the gateway and wallet transaction flow are connected.
+A Next.js App Router / React / TypeScript frontend for Buy Low and Sell High strategies. The default `gateway` mode connects to the deployed contracts on X Layer Testnet (1952) and `https://api.payoff.finance`, with desktop and mobile layouts. The browser calls the VPS directly and sends transactions through the connected wallet.
 
 ## Run locally
 
@@ -11,11 +11,11 @@ npm ci
 npm run dev:web
 ```
 
-Open [localhost:3000](http://localhost:3000). Browse the two fixed expiry dates and target prices, then connect a browser wallet to read its testnet balances. No transaction or message signature is requested.
+Open [localhost:3000](http://localhost:3000). Browse the fixed expiry dates and target prices, then connect a browser wallet. Buy Low approves the required test USDG; Sell High wraps only the missing stock quantity and approves wrapped collateral. Request a quote, review the terms and confirm the trade in your wallet. You need test OKB for gas and sufficient collateral.
 
 The public [deployment catalog](../config/xlayer-testnet.json) supplies contract addresses and discovery IDs 5–20. Every series term, token binding, fee and wrapping rate is verified from the RPC at one block. The page excludes series whose trading cutoff has passed, and displays dates in New York time. Prices are contract strikes converted at the current wrapping rate, not live stock prices. Old sample series 1–4 remain onchain but are excluded from this catalog.
 
-The assets tNVDAx and twNVDAx are deployment test tokens, not issuer-backed stocks. USDG is the test token distributed by the OKX faucet. **My positions** shows real OKB and token balances, with an explicit notice that position history is not connected. An RPC error clears unavailable data and never falls back to a simulated balance or quote.
+The assets tNVDAx and twNVDAx are deployment test tokens, not issuer-backed stocks. USDG is the test token distributed by the OKX faucet. **My positions** recovers positions from Exchange events and Vault state, including series no longer in the active catalog. Eligible positions can be claimed after dealer exercise or expiry. Clearing browser storage does not remove onchain positions. An RPC error clears unavailable data and never falls back to a simulated balance or quote.
 
 ## Optional local demo
 
@@ -43,7 +43,10 @@ Demo records live in browser localStorage, separately for each account. Clearing
 | `src/lib/amounts.ts`                   | BigInt conversions using the shared SDK                      |
 | `src/lib/config.ts`                    | Build-time configuration validation                          |
 | `src/lib/wallet.ts`                    | EIP-6963 discovery, wallet connection and network switching  |
-| `src/lib/chain.ts`                     | Read-only contract access and fill-calldata validation       |
+| `src/lib/chain.ts`                     | Contract ABIs, balances and fill-calldata validation         |
+| `src/lib/transactions.ts`              | Wallet guards, approvals, wrapping, fills and claims         |
+| `src/lib/activity.ts`                  | Pending transaction journal and receipt recovery             |
+| `src/lib/data/positions.ts`            | Paginated event discovery and authoritative Vault reads      |
 | `src/lib/data/demo.ts`                 | Fixed quotes and local simulated balances                    |
 | `src/lib/data/gateway.ts`              | Browser-to-VPS HTTP adapter                                  |
 | `src/lib/data/testnet.ts`              | Public deployment discovery; quotes explicitly unavailable   |
@@ -52,9 +55,9 @@ Demo records live in browser localStorage, separately for each account. Clearing
 
 Pages access products through `ProductAdapter`. Quote types and Zod schemas reuse `gateway/src/types.ts`; amount calculations reuse `sdk/wrapped-assets.mjs`. The frontend contains no dealer pricing algorithm or private signing key.
 
-`DemoQuote` and `GatewayQuote` are separate types. Demo quotes have `null` signatures and transactions, and the real gateway adapter and transaction encoder reject them. This version has no wallet transaction sender.
+`DemoQuote` and `GatewayQuote` are separate types. Demo quotes have `null` signatures and transactions, and the real gateway adapter and transaction encoder reject them. Only gateway mode can use the real wallet transaction sender. Explicit `testnet` mode remains read-only.
 
-The gateway adapter implements market discovery, onchain series/balance reads, quote polling, preparation and receipt queries, with order, fee, target-contract and calldata validation. Testnet reads are connected directly to the public deployment; the VPS quote service is not connected. Real wrapping, approvals, transaction submission, receipt recovery and complete position indexing remain pending. Changing the configuration alone does not enable trading.
+The gateway adapter implements market discovery, onchain series/balance reads, quote polling, preparation and receipt queries, with order, fee, target-contract and calldata validation. Before a fill, the adapter rechecks the selected quote; the wallet sender simulates the exact transaction and waits for two confirmations. Approvals request the needed amount when the existing allowance is insufficient. Submitted hashes survive a page reload; Check status reconciles them with chain receipts. A receipt-reporting outage does not erase a successful onchain fill.
 
 ## Amounts and settlement
 
@@ -73,7 +76,7 @@ The repository includes [vercel.json](vercel.json):
 1. Import the repository and set **Root Directory** to `web`, framework to **Next.js**, and Node.js to **24.x**.
 2. Include source files outside the root directory in the build step: the app imports the root SDK and gateway schemas.
 3. Use the install and build commands in `vercel.json`. They install the web workspace from the repository root and build inside `web`.
-4. Set `NEXT_PUBLIC_DATA_MODE=testnet`, or remove an old `demo` override to use the default. Leave `NEXT_PUBLIC_GATEWAY_URL` empty. The public RPC, explorer and Vault defaults come from the deployment catalog. If you previously configured another Vault, update it to the catalog address or remove the override. Redeploy after changing these settings.
+4. Set `NEXT_PUBLIC_DATA_MODE=gateway` and `NEXT_PUBLIC_GATEWAY_URL=https://api.payoff.finance`. The public RPC, explorer and Vault defaults come from the deployment catalog. If you previously configured another Vault, update it to the catalog address or remove the override. Redeploy after changing these settings.
 5. Verify locally with `npm run build:web`; preview the production build with `npm run start:web`.
 
 `NEXT_PUBLIC_*` values are embedded in the browser bundle at build time. Rebuild after changing them. Never place private keys, private RPC credentials, database URLs or dealer authentication tokens in those variables. Copy [the environment example](.env.example) to `web/.env.local` for local overrides.
@@ -84,12 +87,13 @@ The repository includes [vercel.json](vercel.json):
 Browser → Vercel / Next.js: load the website
 Browser → VPS RFQ gateway: request and prepare quotes
 Gateway → self-operated and other whitelisted dealers: collect offers
-Browser → X Layer RPC: read chain state
+Browser → wallet → X Layer contracts: approve, wrap, fill and claim
+Browser → X Layer RPC: read market, balances, positions and receipts
 ```
 
 RFQ traffic goes directly to the gateway. There is no Next.js RFQ proxy or demo serverless function. Other independent web features can use Route Handlers when needed.
 
-For future integration, set `NEXT_PUBLIC_DATA_MODE=gateway`, `NEXT_PUBLIC_GATEWAY_URL=https://api.example.com` and `NEXT_PUBLIC_NVDA_VAULT` to the deployed NVDAx Vault. The default frontend network is X Layer testnet 1952. Chain IDs and contract bindings must match; errors never fall back to simulated success.
+For another gateway deployment, set `NEXT_PUBLIC_GATEWAY_URL`, `NEXT_PUBLIC_NVDA_VAULT` and `NEXT_PUBLIC_DEPLOYMENT_BLOCK` consistently with its deployed contracts. The default frontend network is X Layer testnet 1952. Chain IDs and contract bindings must match; errors never fall back to simulated success.
 
 The gateway must allow the frontend origin and JSON/`Idempotency-Key` CORS preflights. An HTTPS website needs an HTTPS API. CORS is not user authentication or a restriction on non-browser API clients.
 
@@ -99,15 +103,30 @@ From the repository root:
 
 ```sh
 npm run test:web
+npm run test:gateway:integration
 npm run build:web
 npm run typecheck --workspace @payoff/web
 npm run format:check --workspace @payoff/web
 npm run test:web:e2e
 npm run test:e2e:testnet --workspace @payoff/web
+npm run test:e2e:gateway --workspace @payoff/web
 ```
 
-Unit tests cover deployment bindings, series discovery, unavailable quotes, fixed W/U accounting, all four settlement outcomes, duplicate fills/claims, precision, insufficient balances, account isolation, expired or changed orders and gateway transaction validation.
+Local EVM integration also exercises the frontend wallet sender against actual contracts and gateway: exact approvals, stock wrapping, both fills, event-based position recovery, exercised Call claims and expired Put claims.
 
-Playwright starts a development server on port 3100 and tests desktop and mobile sizes. On macOS it uses installed Google Chrome. On Linux, install Chromium first with `npx playwright install --with-deps chromium` from `web/`. Testnet browser tests run separately on port 3101 against deterministic RPC responses, exercising series and expiry selection, wallet balances, unavailable quotes, failed reads and closed series. The demo suite covers the full demo flow, expiry countdowns, no quotes, cancellations, wallet account changes, no-signature guarantees, layout overflow and keyboard dismissal.
+Unit tests cover wallet rejection, network/account guards, pending receipt recovery, demo isolation, deployment bindings, series discovery, unavailable quotes, fixed W/U accounting, all four settlement outcomes, duplicate fills/claims, precision, insufficient balances, account isolation, expired or changed orders and gateway transaction validation.
 
-The demo ledger is a single-browser prototype and does not provide transaction guarantees across concurrent tabs. Trading integration must use onchain balances, allowances, signatures and receipts.
+Playwright starts a development server on port 3100 and tests desktop and mobile sizes. On macOS it uses installed Google Chrome. On Linux, install Chromium first with `npx playwright install --with-deps chromium` from `web/`. Testnet browser tests run separately on port 3101 against deterministic RPC responses, exercising series and expiry selection, wallet balances, unavailable quotes, failed reads and closed series. Gateway browser tests run on port 3102 and verify real browser fetch behavior against routed HTTP/RPC responses, including a failed dealer funding check. The demo suite covers the full demo flow, expiry countdowns, no quotes, cancellations, wallet account changes, no-signature guarantees, layout overflow and keyboard dismissal.
+
+## Remaining operational work
+
+- Dealer exercise is not automated. Opening a quote only checks the premium budget; exercise needs the appropriate delivery assets and Vault allowances during the exercise window. Otherwise the position expires without exercise and the user reclaims collateral.
+- The catalog currently ends on October 2, 2026. New series and dealer contract mappings need to be scheduled before existing batches close.
+- New testers need OKB, USDG and/or owner-minted test stock. There is no integrated stock faucet or wrapped-stock redemption UI; claims deliver the contract-specified token, including wrapped stock.
+- Position history currently scans paginated RPC logs from the deployment block. A backend index is needed as history grows. Pending transaction recovery handles observed receipts and replacements while the page is open; a replacement made while the page is closed may require manual wallet/explorer reconciliation.
+- The quote notice explains use of the last valid bid, but the dealer market-data timestamp is not yet exposed per quote to the frontend.
+- There is one admitted self-operated dealer. Quote checks do not reserve funds. No hedging, automatic market-maker competition guarantees or mainnet rollout is implied.
+- Monitor dealer balances, provider health, quote failures and series expiry. Add alerts and verify logical database backup/restore.
+- Gateway CORS must include each frontend origin. Production and localhost:3000 are allowed; arbitrary Vercel preview origins are not enabled automatically.
+
+The optional demo ledger is a single-browser prototype; the gateway mode uses onchain assets and receipts.

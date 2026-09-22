@@ -1,5 +1,4 @@
 'use client';
-import { UserFacingError } from '@/lib/errors';
 import {
   createContext,
   useCallback,
@@ -24,7 +23,8 @@ import {
   type Connection,
   type WalletOption,
 } from '@/lib/wallet';
-import { publicClient, vaultAbi } from '@/lib/chain';
+import { readPositions } from '@/lib/data/positions';
+import { readActivity, recoverActivity, type Activity } from '@/lib/activity';
 import { shortAddress } from '@/lib/amounts';
 import { Modal } from './modal';
 import { Icon } from './icon';
@@ -35,6 +35,8 @@ type ContextValue = {
   market: Market | null;
   balances: Balances | null;
   positions: Position[];
+  positionsError: string;
+  activity: Activity[];
   connection: Connection | null;
   loading: boolean;
   error: string;
@@ -54,9 +56,6 @@ export function useProduct() {
   if (!context) throw new Error('Missing product provider');
   return context;
 }
-export function positionStorageKey(config: Config, account: Address) {
-  return `payoff.chain.v1.${config.chainId}.${config.gatewayUrl}.${account.toLowerCase()}`;
-}
 export function AppProvider({ children }: { children: ReactNode }) {
   const [config] = useState(getConfig);
   const [adapter, setAdapter] = useState<ProductAdapter | null>(null);
@@ -64,6 +63,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [market, setMarket] = useState<Market | null>(null),
     [balances, setBalances] = useState<Balances | null>(null),
     [positions, setPositions] = useState<Position[]>([]);
+  const [positionsError, setPositionsError] = useState('');
+  const [activity, setActivity] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [walletOpen, setWalletOpen] = useState(false);
@@ -92,6 +93,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMarket(null);
     setBalances(null);
     setPositions([]);
+    setPositionsError('');
+    setActivity([]);
     setError('');
     setRevision((v) => v + 1);
   }, [config, currentAccount]);
@@ -110,42 +113,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const b =
         connection && m.series[0] ? await adapter.balances(connection.address, m, m.series[0].vault) : null;
       let p: Position[] = [];
+      let historyError = '';
+      let transactions: Activity[] = [];
       if (connection && adapter instanceof DemoAdapter) p = adapter.state().positions;
       if (connection && adapter instanceof GatewayAdapter) {
-        const stored = JSON.parse(
-          localStorage.getItem(positionStorageKey(config, connection.address)) ?? '[]',
-        ) as Position[];
-        const client = publicClient(config);
-        p = await Promise.all(
-          stored.map(async (position) => {
-            const actual = await client.readContract({
-              address: position.vault,
-              abi: vaultAbi,
-              functionName: 'position',
-              args: [BigInt(position.id)],
-            });
-            if (actual.shortHolder.toLowerCase() !== connection.address.toLowerCase())
-              throw new UserFacingError('The position owner does not match the connected account.');
-            return {
-              ...position,
-              wrappedQuantity: String(actual.wrappedQuantity),
-              strikeAmountUSDG: String(actual.strikeAmountUSDG),
-              status:
-                actual.state === 4
-                  ? 'claimed'
-                  : actual.state === 2
-                    ? 'exercised'
-                    : actual.state === 3
-                      ? 'expired'
-                      : 'open',
-            } as Position;
-          }),
-        );
+        transactions = await recoverActivity(localStorage, config, connection.address);
+        try {
+          p = await readPositions(config, connection.address, m);
+        } catch {
+          historyError = 'Position history could not be loaded from the chain. Refresh to try again.';
+        }
       }
       if (gen === generation.current && req === request.current) {
         setMarket(m);
         setBalances(b);
         setPositions(p);
+        setPositionsError(historyError);
+        setActivity(transactions);
         setError('');
       }
     } catch (e) {
@@ -162,6 +146,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void reload();
   }, [reload]);
+  useEffect(() => {
+    if (config.mode !== 'gateway' || !connection) return;
+    const update = () => {
+      try {
+        setActivity(readActivity(localStorage, config, connection.address));
+      } catch {
+        setError('Saved transaction status could not be read. Check your wallet activity before trading.');
+      }
+    };
+    update();
+    window.addEventListener('payoff:transactions', update);
+    return () => window.removeEventListener('payoff:transactions', update);
+  }, [config, connection?.address]);
   useEffect(() => {
     const listener = () => {
       void reload();
@@ -246,6 +243,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       market,
       balances,
       positions,
+      positionsError,
+      activity,
       connection,
       loading,
       error,
@@ -265,6 +264,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       market,
       balances,
       positions,
+      positionsError,
+      activity,
       connection,
       loading,
       error,

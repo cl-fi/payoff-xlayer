@@ -15,6 +15,19 @@ import { buildApp } from '../../src/app.js';
 import { GatewayError } from '../../src/errors.js';
 import { db, dealer, dealerServer, json, makerA, makerB, signed, user } from '../helpers.js';
 import { quoteDigest, signQuote } from '../../../sdk/quotes.mjs';
+// The dealer is a separate Node service; exercise its real signer and chain reader here.
+// @ts-ignore JavaScript service entry point
+import { buildDealerApp } from '../../../dealer/src/app.mjs';
+// @ts-ignore JavaScript service entry point
+import { DealerChain } from '../../../dealer/src/chain.mjs';
+import { TradingWallet } from '../../../web/src/lib/transactions.js';
+import { readPositions } from '../../../web/src/lib/data/positions.js';
+import { readActivity } from '../../../web/src/lib/activity.js';
+import { previewOrder } from '../../../web/src/lib/amounts.js';
+import { readOnchainMarket } from '../../../web/src/lib/data/onchain.js';
+import type { Config } from '../../../web/src/lib/config.js';
+import type { Connection } from '../../../web/src/lib/wallet.js';
+import type { GatewayAdapter } from '../../../web/src/lib/data/gateway.js';
 
 const require = createRequire(import.meta.url);
 async function artifact(name: string) {
@@ -111,6 +124,30 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
     const position = await publicClient.readContract({ address: vault, abi: (await artifact('SeriesVault')).abi, functionName: 'position', args: [2n] }) as any;
     assert.equal(position.wrappedQuantity, 10n ** 18n); assert.equal(position.wrappedBalance, 10n ** 18n);
   });
+  await t.test('50%-bid dealer uses prior-session bids for both sides, signs, simulates and executes', async () => {
+    const dealerConfig = { ...cfg, markets: [{ vault, stock, wrappedStock: wrapped, symbol: 'NVDA', seriesIds: ['1', '2'] }],
+      premiumBps: 5000, premiumBasis: 'net', quoteTtlSeconds: 30, maxQuoteAgeSeconds: 30 };
+    const dealerChain = new DealerChain(dealerConfig, rpc, makerB.address);
+    await dealerChain.health();
+    const makerApp = await buildDealerApp({ config: dealerConfig, chain: dealerChain, account: makerB, token: 'integration-token',
+      provider: { ready: true, quote: async (option: any) => ({ ...option, bidMicros: '1000000', askMicros: '1100000', bidSize: 5,
+        timestampMs: Date.now() - 86400000, marketOpenMs: Date.now() - 90000000, marketCloseMs: Date.now() - 82800000,
+        expirationCloseMs: Number(now + 4300n) * 1000 }) } });
+    await makerApp.listen({ host: '127.0.0.1', port: 0 });
+    try {
+      const url = `http://127.0.0.1:${(makerApp.server.address() as { port: number }).port}/quote`;
+      const g = new Gateway({ ...cfg, dealers: [{ ...dealer('real-service', url, makerB), bearerTokenEnv: 'TOKEN' }] },
+        chain, database.store, new Map([['real-service', 'integration-token']]));
+      for (const seriesId of ['1', '2']) {
+        const result = (await g.create({ ...order, seriesId }, randomUUID())).body as any;
+        assert.equal(result.status, 'quoted', JSON.stringify(result));
+        assert.equal(result.selection.quote.netPremiumUSDG, '500000');
+        const tx = await taker.sendTransaction({ to: exchange, data: result.selection.transaction.data, value: 0n });
+        assert.equal((await receipt(tx)).status, 'success');
+        assert.equal((await g.transaction(result.requestId, tx)).status, 'confirmed');
+      }
+    } finally { await makerApp.close(); }
+  });
   for (const testMode of ['bad-signature', 'wrong-domain', 'expired']) {
     await t.test(`${testMode} higher bid loses to a valid lower bid`, async () => {
       mode = testMode;
@@ -167,5 +204,59 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
     await write(owner, 'RFQExchange', exchange, 'cancelNonce', [BigInt(result.selection.quote.nonce)]);
     const tx = await taker.sendTransaction({ to: exchange, data: result.selection.transaction.data, value: 0n, gas: 800000n });
     assert.equal((await receipt(tx)).status, 'reverted'); assert.equal((await gateway.transaction(result.requestId, tx)).status, 'reverted');
+  });
+  await t.test('frontend wallet wraps, approves, fills both sides, recovers positions, and claims exercise/expiry proceeds', async () => {
+    const c = { mode: 'gateway', chainId: 31337, rpcUrl: rpc, explorerUrl: 'https://example.test', gatewayUrl: '', nvdaVault: vault, deploymentBlock: '0' } as unknown as Config;
+    const market = await readOnchainMarket(c, { chainId: 31337, exchange, usdg: usd, markets: [{ vault, seriesIds: ['1', '2'] }] }, publicClient as any);
+    const values = new Map<string, string>();
+    const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+    const provider = { request: async ({ method, params }: any) => {
+      if (method === 'eth_accounts') return [user.address];
+      if (method === 'eth_chainId') return '0x7a69';
+      if (method === 'eth_sendTransaction') {
+        const tx = params[0];
+        return taker.sendTransaction({ to: tx.to, data: tx.data, value: BigInt(tx.value ?? 0), gas: BigInt(tx.gas) });
+      }
+      throw new Error(`Unexpected wallet method ${method}`);
+    } };
+    const connection = { kind: 'wallet', address: user.address, chainId: 31337, name: 'Anvil wallet', provider } as Connection;
+    const confirmingClient = { ...publicClient, waitForTransactionReceipt: async (options: any) => {
+      await publicClient.waitForTransactionReceipt({ ...options, confirmations: 1, pollingInterval: 20 });
+      await publicClient.request({ method: 'evm_mine' as any, params: [] as any });
+      return publicClient.waitForTransactionReceipt({ ...options, pollingInterval: 20 });
+    } };
+    {
+      const trader = new TradingWallet(c, connection, storage, () => {}, () => {}, confirmingClient as any);
+      await write(taker, 'MockUSDG', usd, 'approve', [vault, 0n]);
+      const wrappedBalance = await publicClient.readContract({ address: wrapped, abi: (await artifact('MockWrappedXStock')).abi, functionName: 'balanceOf', args: [user.address] }) as bigint;
+      await write(taker, 'MockWrappedXStock', wrapped, 'transfer', [feeRecipient, wrappedBalance]);
+      await write(taker, 'MockWrappedXStock', wrapped, 'approve', [vault, 0n]);
+      await write(taker, 'MockXStock', stock, 'approve', [wrapped, 0n]);
+      await write(owner, 'MockXStock', stock, 'mint', [user.address, 10n ** 18n]);
+      const opened = [];
+      const adapter = { prepare: async (q: any) => ({ kind: 'gateway', requestId: q.requestId, selection: (await gateway.prepare(q.requestId)).selection }),
+        settlement: (id: any, hash: any) => gateway.transaction(id, hash) } as unknown as GatewayAdapter;
+      for (const series of market.series) {
+        const preview = previewOrder('0.001', series, market, user.address);
+        await trader.prepareAssets(preview, market);
+        const result = (await gateway.create(preview.order, randomUUID())).body as any;
+        assert.equal(result.status, 'quoted');
+        opened.push(await trader.fill(adapter, preview, { kind: 'gateway', requestId: result.requestId, selection: result.selection }, market));
+      }
+      const recovered = await readPositions(c, user.address, market, publicClient as any);
+      for (const p of opened) assert.ok(recovered.some(r => r.id === p.id && r.netPremiumUSDG === p.netPremiumUSDG));
+      assert.equal(readActivity(storage, c, user.address).some(tx => tx.status === 'pending'), false);
+      assert.ok(readActivity(storage, c, user.address).some(tx => tx.kind === 'wrap'));
+      await publicClient.request({ method: 'evm_setNextBlockTimestamp' as any, params: [Number(now + 4000n)] as any });
+      await publicClient.request({ method: 'evm_mine' as any, params: [] as any });
+      await write(owner, 'MockUSDG', usd, 'approve', [vault, 180000n]);
+      await write(owner, 'SeriesVault', vault, 'exercise', [BigInt(opened[1].id)]);
+      await trader.claim(opened[1]);
+      await publicClient.request({ method: 'evm_setNextBlockTimestamp' as any, params: [Number(now + 4300n)] as any });
+      await publicClient.request({ method: 'evm_mine' as any, params: [] as any });
+      await trader.claim(opened[0]);
+      const claimed = await readPositions(c, user.address, market, publicClient as any);
+      for (const p of opened) assert.equal(claimed.find(r => r.id === p.id)?.status, 'claimed');
+    }
   });
 });

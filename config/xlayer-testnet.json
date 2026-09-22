@@ -1,5 +1,6 @@
 {
   "chainId": 1952,
+  "deploymentBlock": "41537234",
   "rpcUrl": "https://testrpc.xlayer.tech/terigon",
   "explorerUrl": "https://www.okx.com/web3/explorer/xlayer-test",
   "exchange": "0x8CBe4402aF2FD60A6BfeF7A4bC5697157f356f5f",

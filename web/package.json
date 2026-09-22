@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "format": "prettier --write src test e2e *.ts *.json README.md",
     "format:check": "prettier --check src test e2e *.ts *.json README.md",
-    "test:e2e:testnet": "playwright test --config playwright.testnet.config.ts"
+    "test:e2e:testnet": "playwright test --config playwright.testnet.config.ts",
+    "test:e2e:gateway": "playwright test --config playwright.gateway.config.ts"
   },
   "dependencies": {
     "next": "16.3.5",

@@ -98,17 +98,22 @@ Supply a reachable PostgreSQL database, RPC, deployed Exchange/Vault/series, adm
 ```sh
 cp gateway/config.example.json gateway/config.local.json
 cp gateway/deploy/.env.example gateway/deploy/.env
-# Fill both files. Generate a URL-safe database password, for example with openssl rand -hex 24.
+cp dealer/config.example.json dealer/config.local.json
+cp gateway/deploy/dealer.env.example gateway/deploy/dealer.env
+chmod 600 gateway/deploy/.env gateway/deploy/dealer.env
+# Configure chain addresses, dedicated funded/whitelisted dealer, ThetaData and the API site.
+# Generate a URL-safe database password, for example with openssl rand -hex 24.
 docker compose -f gateway/deploy/compose.yaml --env-file gateway/deploy/.env up -d --build
 ```
 
 Compose waits for PostgreSQL, initializes the tables and starts the gateway. Database data lives in a named volume. Back up before upgrades; `down -v` deletes that data.
 
-- The gateway binds to `127.0.0.1:8080` on the host. Use a host HTTPS reverse proxy such as [the Caddy example](deploy/Caddyfile.example) to expose your API domain.
+- The gateway binds to `127.0.0.1:8080` on the host. The included Caddy service exposes ports 80/443. Set `GATEWAY_SITE` to an API domain with its DNS pointing at this host for automatic HTTPS. `http://server-ip` supports initial IP-only deployment; an HTTPS frontend needs an HTTPS gateway before browser integration.
 - Put the frontend origin in `allowedOrigins` and use the HTTPS API URL in the frontend configuration. CORS governs browser access; it is not authentication.
 - PostgreSQL has no published host port and does not join the dealer network.
-- Run the self-operated dealer as a separate service on `payoff_dealers`, with the `self-dealer` network alias for the sample URL. The dealer can call external data/RPC services without publishing its own port.
-- Configure external dealers with their own HTTPS URLs. Configure only actual trusted proxy IPs/CIDRs in `trustedProxies` for accurate client rate limits.
+- The [self-operated dealer](../dealer/README.md) runs as a separate service at `http://self-dealer:8081/quote` on `payoff_dealers`. It prices exact-match options at 50% of current ThetaData bid and signs with its dedicated wallet. Set `collectMs` above the maker's data/RPC latency budget (the deployed configuration uses 12 seconds). The dealer can call data/RPC services without publishing its own port.
+- Configure external dealers with their own HTTPS URLs. The Compose proxy has address `172.30.0.3` on the dedicated `172.30.0.0/28` edge network; set `trustedProxies` to that address for client rate limits. If that subnet conflicts with an existing network, change both Compose and the gateway configuration together.
+- Store only the dealer key and ThetaData key in `dealer.env`. The gateway gets the shared dealer token, RPC and database connection, never the private key or data-provider credentials.
 - Monitor liveness and readiness separately. The service shuts down gracefully and persists requests, quotes, selection and receipt observations in PostgreSQL.
 
 Collection windows, timeouts, rate limits and confirmation counts are configurable operating defaults, not measured production guarantees. Rate and concurrency counters are currently local to one process; horizontal scaling needs shared limits.

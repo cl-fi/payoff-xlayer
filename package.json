@@ -2,7 +2,7 @@
   "name": "payoff-xlayer",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["gateway", "web"],
+  "workspaces": ["gateway", "web", "dealer"],
   "description": "Payoff Solidity development and X Layer asset verification",
   "scripts": {
     "build": "node scripts/forge.mjs build",
@@ -17,6 +17,8 @@
     "test:gateway:integration": "npm run test:integration --workspace @payoff/rfq-gateway",
     "start:gateway": "npm start --workspace @payoff/rfq-gateway",
     "gateway:migrate": "npm run migrate --workspace @payoff/rfq-gateway",
+    "start:dealer": "npm start --workspace @payoff/self-dealer",
+    "test:dealer": "npm test --workspace @payoff/self-dealer",
     "dev:web": "npm run dev --workspace @payoff/web",
     "build:web": "npm run build --workspace @payoff/web",
     "start:web": "npm start --workspace @payoff/web",

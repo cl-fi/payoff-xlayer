@@ -2,7 +2,7 @@
 
 Buy Low and Sell High strategies for tokenized stocks, with an upfront premium and fixed settlement terms.
 
-Payoff combines Solidity contracts, a shared signing and amount-conversion SDK, an independent RFQ gateway, and a Next.js frontend. The default frontend displays **real X Layer Testnet series and wallet balances**. Quotes, wallet transaction submission and position history are not connected yet. An explicit demo mode remains available for simulated end-to-end flows.
+Payoff combines Solidity contracts, a shared signing and amount-conversion SDK, an independent RFQ gateway, and a Next.js frontend. The default frontend connects to the **deployed X Layer Testnet contracts and HTTPS RFQ gateway**. It supports stock wrapping, collateral approvals, real quotes, wallet fills, chain-recovered positions and claims. An explicit demo mode remains available for simulated end-to-end flows.
 
 ## Try the product
 
@@ -15,7 +15,7 @@ npm ci
 npm run dev:web
 ```
 
-Open [localhost:3000](http://localhost:3000) to browse deployed series by expiry and target price. Connect a browser wallet to read its testnet balances. The quote service is explicitly unavailable; no signatures or transactions are requested. For the isolated simulated trade flow, set `NEXT_PUBLIC_DATA_MODE=demo` in `web/.env.local` and restart the app.
+Open [localhost:3000](http://localhost:3000) to browse deployed series by expiry and target price. Connect a browser wallet on X Layer Testnet, fund it with test OKB and the relevant test collateral, prepare assets and request a quote. Wallet confirmations authorize real testnet transactions. For the isolated simulated trade flow, set `NEXT_PUBLIC_DATA_MODE=demo` in `web/.env.local` and restart the app.
 
 See the [frontend guide](web/README.md) for deployment settings and demo controls.
 
@@ -42,7 +42,7 @@ Browser / Next.js frontend
                               └── SeriesVault: stock B → series → positions
 ```
 
-The wallet transaction path is implemented in the contracts and gateway; sending those transactions from the frontend remains integration work.
+The browser sends wallet transactions directly to the deployed contracts. Pending transaction hashes are kept locally; positions are recovered from chain events and Vault state.
 
 - **One shared RFQExchange** verifies EIP-712 v2 or ERC-1271 signatures, dealer and Vault admission, fees, deadlines, nonces, and user execution limits. Quotes bind the user, Vault and series.
 - **One SeriesVault per stock** holds collateral and records series and positions. Exercise and claims go directly to that Vault. Trades only inspect their selected market; there is no cross-stock aggregate collateral cap.
@@ -61,6 +61,7 @@ The wallet transaction path is implemented in the contracts and gateway; sending
 | [src/libraries/ExactERC20.sol](src/libraries/ExactERC20.sol) | Exact balance-delta transfers for wrapped stocks and USDG |
 | [sdk/](sdk/) | Quote signing, typed data and wrapped-asset conversions |
 | [gateway/](gateway/README.md) | TypeScript / Fastify / viem / PostgreSQL RFQ service |
+| [dealer/](dealer/README.md) | Separate self-operated dealer: ThetaData bid × 50%, wrapped-unit conversion and signed quotes |
 | [web/](web/README.md) | Next.js / React / TypeScript frontend |
 | [test/](test/) | Contract lifecycle, fuzz, invariant, SDK and asset fork tests |
 | [test/fixtures/](test/fixtures/) | Public deterministic quote vector and pinned fork data |
@@ -81,6 +82,7 @@ npm test
 npm run test:sdk
 npm run build:gateway
 npm run test:gateway
+npm run test:dealer
 npm run test:gateway:integration
 npm run test:web
 npm run build:web
@@ -109,4 +111,4 @@ The [frontend guide](web/README.md) covers Vercel. The [gateway guide](gateway/R
 
 The [testnet deployment guide](script/README.md) covers chain 1952, encrypted-keystore signing, sample series, and test stock/wrapper assets. The frontend reads deployed Series 5–20 and wallet balances directly from testnet. The test stock and wrapper are not issuer-backed assets. Contract addresses and discovery IDs are public; operational notes and credentials remain excluded.
 
-Live dealer pricing, market data, hedging, automatic exercise, complete position indexing, testnet trading integration and production deployment remain separate work. Demo prices, premiums and fees are test data. Contracts have no proxy upgrade path, administrator withdrawal, price oracle or corporate-action cash adjustment. This is an MVP implementation, not an audited production release.
+The self-operated dealer now supports live ThetaData option snapshots and a simple 50%-of-bid pricing rule, with a shared VPS deployment for the gateway and dealer. The frontend is connected to the gateway. Hedging, automatic dealer exercise, future-series scheduling, public test-asset distribution, a scalable server-side position index and mainnet deployment remain separate work. Demo prices, premiums and fees are test data. Contracts have no proxy upgrade path, administrator withdrawal, price oracle or corporate-action cash adjustment. This is an MVP implementation, not an audited production release.

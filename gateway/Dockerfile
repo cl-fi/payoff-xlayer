@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY gateway/package.json gateway/package.json
 COPY web/package.json web/package.json
+COPY dealer/package.json dealer/package.json
 RUN npm ci --ignore-scripts --workspace @payoff/rfq-gateway --include-workspace-root
 COPY sdk sdk
 COPY gateway/tsconfig.json gateway/tsconfig.json
@@ -15,9 +16,13 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080
 COPY package.json package-lock.json ./
 COPY gateway/package.json gateway/package.json
 COPY web/package.json web/package.json
+COPY dealer/package.json dealer/package.json
 RUN npm ci --omit=dev --ignore-scripts --workspace @payoff/rfq-gateway && npm cache clean --force
 COPY --from=build /app/sdk ./sdk
 COPY --from=build /app/gateway/dist ./gateway/dist
+# Source archives may have been extracted with a private host umask. Only code and
+# dependencies are in this image; runtime credentials are supplied separately.
+RUN chmod -R a+rX /app
 USER node
 WORKDIR /app/gateway
 EXPOSE 8080

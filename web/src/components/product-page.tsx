@@ -8,7 +8,10 @@ import { DEMO_ACCOUNT, DemoAdapter, isPrepared } from '@/lib/data/demo';
 import { amount, dateOnly, dateTime, precise, previewOrder, ratio, stockTarget } from '@/lib/amounts';
 import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
 import { quoteTerms, type AppQuote, type Position } from '@/lib/types';
-import { friendlyError } from '@/lib/wallet';
+import { friendlyError, switchNetwork } from '@/lib/wallet';
+import { GatewayAdapter } from '@/lib/data/gateway';
+import { TradingWallet } from '@/lib/transactions';
+import { UserFacingError } from '@/lib/errors';
 
 export function ProductPage() {
   const {
@@ -23,6 +26,7 @@ export function ProductPage() {
     config,
     loading,
     error,
+    activity,
   } = useProduct();
   const [side, setSide] = useState<0 | 1>(0),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
@@ -73,6 +77,8 @@ export function ProductPage() {
     remaining = terms ? Math.max(0, Math.ceil(Number(terms.deadline) - now / 1000)) : 0;
   const cutoff = !!series && now >= Number(series.tradeCutoff) * 1000;
   const readOnly = config.mode === 'testnet';
+  const pending = activity.some((tx) => tx.status === 'pending');
+  const wrongNetwork = connection?.kind === 'wallet' && connection.chainId !== config.chainId;
   const timeZone = config.mode === 'demo' ? undefined : 'America/New_York';
   // Changing any order input invalidates both the visible quote and responses still in flight.
   useEffect(() => {
@@ -115,12 +121,14 @@ export function ProductPage() {
     }
   }
   async function prepare() {
-    if (!(adapter instanceof DemoAdapter) || !preview) return;
+    if (!adapter || !preview || !market || !connection) return;
     const op = ++operation.current;
-    setBusy('Simulating asset preparation…');
+    setBusy(config.mode === 'demo' ? 'Simulating asset preparation…' : 'Checking balances and allowances…');
     setMessage('');
     try {
-      await adapter.prepareAssets(preview);
+      if (adapter instanceof DemoAdapter) await adapter.prepareAssets(preview);
+      else if (adapter instanceof GatewayAdapter) await trader(op).prepareAssets(preview, market);
+      else return;
       if (op !== operation.current) return;
       await reload();
       if (op === operation.current) setDialog(null);
@@ -131,18 +139,18 @@ export function ProductPage() {
     }
   }
   async function fill() {
-    if (!adapter || !preview || !quote || !accepted || remaining <= 0) return;
-    // This release only settles the local demo ledger. No mock reaches a wallet send path.
-    if (!(adapter instanceof DemoAdapter) || quote.kind !== 'demo') {
-      setMessage('Testnet trading will be available after gateway and contract integration.');
-      return;
-    }
+    if (!adapter || !preview || !quote || !market || !accepted || remaining <= 0) return;
     const op = ++operation.current;
-    setBusy('Simulating position opening…');
+    setBusy(config.mode === 'demo' ? 'Simulating position opening…' : 'Rechecking your quote…');
     setMessage('');
     try {
-      await adapter.prepare(quote);
-      const position = await adapter.fill(preview, quote, scenario);
+      let position: Position;
+      if (adapter instanceof DemoAdapter && quote.kind === 'demo') {
+        await adapter.prepare(quote);
+        position = await adapter.fill(preview, quote, scenario);
+      } else if (adapter instanceof GatewayAdapter && quote.kind === 'gateway') {
+        position = await trader(op).fill(adapter, preview, quote, market);
+      } else throw new UserFacingError('This quote does not belong to the current trading environment.');
       if (op !== operation.current) return;
       setCompleted(position);
       setQuote(null);
@@ -151,8 +159,26 @@ export function ProductPage() {
     } catch (e) {
       if (op === operation.current) setMessage(friendlyError(e));
     } finally {
-      if (op === operation.current) setBusy('');
+      if (op === operation.current) {
+        setBusy('');
+        if (config.mode === 'gateway') void reload();
+      }
     }
+  }
+  function trader(op: number) {
+    if (!connection) throw new UserFacingError('Connect your wallet first.');
+    return new TradingWallet(
+      config,
+      connection,
+      localStorage,
+      (text) => {
+        if (op === operation.current) setBusy(text);
+      },
+      () => {
+        if (op !== operation.current)
+          throw new UserFacingError('Your order changed. Review it before continuing.');
+      },
+    );
   }
   const primary = () => {
     if (!connection) {
@@ -160,6 +186,11 @@ export function ProductPage() {
       return;
     }
     if (readOnly) return;
+    if (wrongNetwork && connection.kind === 'wallet') {
+      void switchNetwork(connection.provider, config).catch((e) => setMessage(friendlyError(e)));
+      return;
+    }
+    if (pending) return;
     if (!prepared) {
       setMessage('');
       setDialog('assets');
@@ -427,7 +458,7 @@ export function ProductPage() {
           <button
             className="button primary full main-cta"
             onClick={primary}
-            disabled={!!busy || !preview || cutoff || (readOnly && !!connection)}
+            disabled={!!busy || !preview || cutoff || pending || (readOnly && !!connection)}
           >
             {busy ? (
               <>
@@ -440,6 +471,10 @@ export function ProductPage() {
               'Connect to get started'
             ) : readOnly ? (
               'Quotes unavailable'
+            ) : wrongNetwork ? (
+              'Switch to X Layer Testnet'
+            ) : pending ? (
+              'Transaction pending'
             ) : !prepared ? (
               'Prepare assets'
             ) : (
@@ -470,7 +505,7 @@ export function ProductPage() {
                 <dd>{dateTime(preview.series.tradeCutoff, timeZone)}</dd>
                 <dt>Exercise ends</dt>
                 <dd>{dateTime(preview.series.exerciseEnd, timeZone)}</dd>
-                {readOnly && (
+                {config.mode !== 'demo' && (
                   <>
                     <dt>Onchain series</dt>
                     <dd>Series #{preview.series.id}</dd>
@@ -486,7 +521,7 @@ export function ProductPage() {
               </p>
             </details>
           )}
-          {readOnly && market && (
+          {config.mode !== 'demo' && market && (
             <div className="deployment-links">
               <a href={`${config.explorerUrl}/address/${config.nvdaVault}`} target="_blank" rel="noreferrer">
                 View Vault <Icon name="external" size={12} />
@@ -548,8 +583,8 @@ export function ProductPage() {
             </strong>
           </div>
           <div>
-            <span>Approval scope</span>
-            <span>This order only</span>
+            <span>New approval scope</span>
+            <span>Exact required amount</span>
           </div>
         </div>
         {message && (
@@ -567,10 +602,19 @@ export function ProductPage() {
             </button>
           </>
         ) : (
-          <div className="notice">
-            Testnet asset preparation and trading will be enabled after integration. You can browse products
-            and quotes in this version.
-          </div>
+          <>
+            <p className="fine-print">
+              Each required transaction opens your wallet for confirmation and uses test OKB for gas. Existing
+              wrapped tokens and sufficient approvals are reused.
+            </p>
+            <button
+              className="button primary full"
+              disabled={!!busy || pending || wrongNetwork}
+              onClick={() => void prepare()}
+            >
+              {busy || 'Prepare with wallet'}
+            </button>
+          </>
         )}
       </Modal>
       <Modal
@@ -645,10 +689,10 @@ export function ProductPage() {
             {remaining > 0 ? (
               <button
                 className="button primary full"
-                disabled={!accepted || !!busy || config.mode !== 'demo'}
+                disabled={!accepted || !!busy || pending || wrongNetwork || readOnly}
                 onClick={() => void fill()}
               >
-                {busy || (config.mode === 'demo' ? 'Confirm demo trade' : 'Testnet trading coming soon')}
+                {busy || (config.mode === 'demo' ? 'Confirm demo trade' : 'Confirm trade in wallet')}
               </button>
             ) : (
               <button className="button primary full" disabled={!!busy} onClick={() => void inquire()}>
@@ -656,8 +700,9 @@ export function ProductPage() {
               </button>
             )}
             <p className="fine-print">
-              Quotes must pass execution checks before they expire. Demo actions do not create onchain
-              positions.
+              {config.mode === 'demo'
+                ? 'Quotes must pass execution checks before they expire. Demo actions do not create onchain positions.'
+                : 'Quotes must execute before expiry. Outside market hours, pricing can use the same option’s last valid market bid.'}
             </p>
           </>
         )}
@@ -666,22 +711,36 @@ export function ProductPage() {
         open={dialog === 'success'}
         onClose={() => setDialog(null)}
         title="Your position is open."
-        eyebrow="DEMO POSITION OPENED"
+        eyebrow={config.mode === 'demo' ? 'DEMO POSITION OPENED' : 'TESTNET POSITION OPENED'}
       >
         <div className="success-icon">
           <Icon name="check" size={32} />
         </div>
         <p className="success-copy">
-          Demo position created. <strong>{completed && amount(completed.netPremiumUSDG, 6, 4)} USDG</strong>{' '}
-          in net premium has been added to your demo balance.
+          {config.mode === 'demo' ? 'Demo position created.' : 'Your transaction is confirmed.'}{' '}
+          <strong>{completed && amount(completed.netPremiumUSDG, 6, 4)} USDG</strong> in net premium has been
+          added to your {config.mode === 'demo' ? 'demo balance' : 'wallet'}.
         </p>
         <p className="muted center">
-          View the terms in My positions, or simulate both outcomes and claim your assets.
+          {config.mode === 'demo'
+            ? 'View the terms in My positions, or simulate both outcomes and claim your assets.'
+            : 'Track your position and claim your assets after exercise or expiry.'}
         </p>
         <Link href="/positions" className="button primary full" onClick={() => setDialog(null)}>
           View my positions <Icon name="arrow" size={17} />
         </Link>
-        <p className="fine-print center">Saved in this browser only. No onchain transaction was sent.</p>
+        {completed?.transactionHash ? (
+          <a
+            className="text-link"
+            href={`${config.explorerUrl}/tx/${completed.transactionHash}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View transaction <Icon name="external" size={14} />
+          </a>
+        ) : (
+          <p className="fine-print center">Saved in this browser only. No onchain transaction was sent.</p>
+        )}
       </Modal>
     </div>
   );
