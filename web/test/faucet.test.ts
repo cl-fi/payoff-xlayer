@@ -15,6 +15,9 @@ test('faucet amounts preserve six decimals and allow large quantities without an
   assert.equal(parseFaucetAmount('1000000000000.123456'), 1000000000000123456n);
   for (const input of ['', '0', '-1', '1e6', '1.0000001', 'NaN', String(2n ** 256n)])
     assert.throws(() => parseFaucetAmount(input));
+  assert.equal(parseFaucetAmount('0.000000000000000001', 'stock'), 1n);
+  assert.equal(parseFaucetAmount('1.123456789123456789', 'stock'), 1123456789123456789n);
+  assert.throws(() => parseFaucetAmount('1.0000000000000000001', 'stock'));
 });
 
 test('faucet mints the chosen amount to the current token, records its receipt and rejects foreign deployments', async () => {
@@ -28,7 +31,9 @@ test('faucet mints the chosen amount to the current token, records its receipt a
     setItem: (k: string, v: string) => saved.set(k, v),
   };
   const sent: any[] = [];
-  let symbol = 'tUSDG';
+  let symbol = 'tUSDG',
+    stockAddress = deployment.stock,
+    inventory = 10n ** 24n;
   const provider = {
     request: async ({ method, params }: any) => {
       if (method === 'eth_accounts') return [address];
@@ -41,7 +46,13 @@ test('faucet mints the chosen amount to the current token, records its receipt a
     },
   };
   const client = {
-    readContract: async ({ functionName }: any) => (functionName === 'symbol' ? symbol : 6),
+    readContract: async ({ functionName, address: token }: any) => {
+      if (functionName === 'stock') return stockAddress;
+      if (functionName === 'balanceOf') return inventory;
+      const stock = token.toLowerCase() === deployment.stock.toLowerCase();
+      if (functionName === 'symbol') return stock ? 'tNVDAx' : symbol;
+      return stock ? 18 : 6;
+    },
     estimateGas: async () => 100000n,
     waitForTransactionReceipt: async () => ({
       transactionHash: hash,
@@ -71,4 +82,14 @@ test('faucet mints the chosen amount to the current token, records its receipt a
   symbol = 'USDG';
   await assert.rejects(wallet.faucet(market, 1n), /unavailable/);
   assert.equal(sent.length, 1);
+  await wallet.faucet(market, 1123456789123456789n, 'stock');
+  assert.equal(sent[1].to.toLowerCase(), deployment.stockFaucet.toLowerCase());
+  assert.deepEqual(decodeFunctionData({ abi: faucetAbi, data: sent[1].data }).args, [1123456789123456789n]);
+  stockAddress = address;
+  await assert.rejects(wallet.faucet(market, 1n, 'stock'), /does not match/);
+  stockAddress = deployment.stock;
+  inventory = 0n;
+  await assert.rejects(wallet.faucet(market, 1n, 'stock'), /needs more test tokens/);
+  await assert.rejects(wallet.faucet({ ...market, stock: address }, 1n, 'stock'), /does not match/);
+  assert.equal(sent.length, 2);
 });

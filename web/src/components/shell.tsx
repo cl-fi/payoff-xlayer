@@ -60,7 +60,9 @@ export function Shell({ children }: { children: ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={
-                  pathname === item.href || (item.href === '/positions' && pathname.startsWith('/positions/'))
+                  pathname === item.href ||
+                  (item.href === '/' && pathname === '/sell-high') ||
+                  (item.href === '/positions' && pathname.startsWith('/positions/'))
                     ? 'active'
                     : ''
                 }

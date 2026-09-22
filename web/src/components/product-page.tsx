@@ -15,7 +15,7 @@ import { UserFacingError } from '@/lib/errors';
 import { referenceEstimate } from '@/lib/data/reference';
 import { NvidiaPriceChart } from './nvidia-price-chart';
 
-export function ProductPage() {
+export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const {
     adapter,
     market,
@@ -33,7 +33,7 @@ export function ProductPage() {
     referenceError,
     balancesError,
   } = useProduct();
-  const [side, setSide] = useState<0 | 1>(0),
+  const [side, setSide] = useState<0 | 1>(initialSide),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
     [selectedExpiry, setSelectedExpiry] = useState<string | null>(null),
     [quantity, setQuantity] = useState('1');
@@ -239,7 +239,6 @@ export function ProductPage() {
               {config.mode === 'demo' ? 'Demo product' : 'Testnet product'}
             </span>
           </div>
-          <NvidiaPriceChart />
           <div className="strategy-tabs" role="tablist" aria-label="Strategy">
             <button
               role="tab"
@@ -264,6 +263,7 @@ export function ProductPage() {
               </span>
             </button>
           </div>
+          <NvidiaPriceChart />
           <div className="strategy-content">
             <div className="eyebrow">{isPut ? 'BUY LOWER' : 'SELL HIGHER'}</div>
             <h2>{isPut ? 'Get paid to wait for your price.' : 'Give your holdings a selling target.'}</h2>
@@ -500,6 +500,14 @@ export function ProductPage() {
                 ? `${amount(balances.usdg)} USDG`
                 : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
             </div>
+          )}
+          {config.mode === 'gateway' && (
+            <p className="input-help">
+              Need test assets?{' '}
+              <Link className="text-link" href={`/faucet#${isPut ? 'usdg' : 'stock'}`}>
+                {isPut ? 'Get test USDG' : 'Get test NVIDIA'}
+              </Link>
+            </p>
           )}
           {message && !dialog && (
             <div role="alert" className="notice">

@@ -3,21 +3,34 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useProduct } from './provider';
 import { TradingWallet } from '@/lib/transactions';
-import { parseFaucetAmount } from '@/lib/faucet';
+import { parseFaucetAmount, type FaucetAsset } from '@/lib/faucet';
 import { amount, shortAddress } from '@/lib/amounts';
 import { friendlyError } from '@/lib/wallet';
 
+const assets = [
+  { id: 'usdg', name: 'Payoff Test USDG', symbol: 'tUSDG', strategy: 'Buy Low', href: '/', decimals: 6 },
+  {
+    id: 'stock',
+    name: 'Payoff Test NVIDIA',
+    symbol: 'tNVDAx',
+    strategy: 'Sell High',
+    href: '/sell-high',
+    decimals: 18,
+  },
+] as const;
+
 export function FaucetPage() {
-  const { config, market, balances, connection, revision, reload, setWalletOpen } = useProduct();
-  const [input, setInput] = useState('10000'),
-    [busy, setBusy] = useState(false),
-    [message, setMessage] = useState('');
+  const { config, market, balances, balancesError, connection, revision, reload, setWalletOpen } =
+    useProduct();
+  const [inputs, setInputs] = useState({ usdg: '10000', stock: '10' }),
+    [busy, setBusy] = useState<FaucetAsset | null>(null),
+    [messages, setMessages] = useState({ usdg: '', stock: '' });
   const generation = useRef(revision);
   generation.current = revision;
   useEffect(() => {
-    setMessage('');
+    setMessages({ usdg: '', stock: '' });
   }, [revision]);
-  async function claim() {
+  async function claim(asset: FaucetAsset) {
     if (!connection) {
       setWalletOpen(true);
       return;
@@ -28,24 +41,26 @@ export function FaucetPage() {
       if (original !== generation.current)
         throw new Error('Your wallet changed. Review the faucet request again.');
     };
-    setBusy(true);
-    setMessage('');
+    const message = (text: string) => {
+      if (original === generation.current) setMessages((previous) => ({ ...previous, [asset]: text }));
+    };
+    setBusy(asset);
+    message('');
     try {
-      await new TradingWallet(
-        config,
-        connection,
-        localStorage,
-        (text) => {
-          if (original === generation.current) setMessage(text);
-        },
-        current,
-      ).faucet(market, parseFaucetAmount(input));
-      if (original === generation.current)
-        setMessage('Test USDG received. You can now use it in Buy Low products.');
+      await new TradingWallet(config, connection, localStorage, message, current).faucet(
+        market,
+        parseFaucetAmount(inputs[asset], asset),
+        asset,
+      );
+      message(
+        asset === 'stock'
+          ? 'Test NVIDIA received. Open Sell High to wrap your tokens and prepare an order.'
+          : 'Test USDG received. You can now use it in Buy Low products.',
+      );
     } catch (e) {
-      if (original === generation.current) setMessage(friendlyError(e));
+      message(friendlyError(e));
     } finally {
-      setBusy(false);
+      setBusy(null);
       void reload();
     }
   }
@@ -56,63 +71,91 @@ export function FaucetPage() {
           <div className="eyebrow">
             <span className="teal-line" /> TEST ASSETS
           </div>
-          <h1>Get test USDG.</h1>
-          <p>Mint Payoff tUSDG to your connected wallet and explore the products.</p>
+          <h1>Get test tokens.</h1>
+          <p>Get USDG for Buy Low, or NVIDIA test tokens for Sell High.</p>
         </div>
-        <Link className="button secondary" href="/">
-          Explore products
-        </Link>
-      </section>
-      <section className="test-asset-card" aria-label="Test USDG faucet">
-        <h2>
-          Payoff Test USDG <span className="muted">· tUSDG</span>
-        </h2>
-        <p>
-          Freely mintable on X Layer Testnet. No daily quota or waiting period. These tokens have no monetary
-          value.
-        </p>
-        <p>
-          The USDG amounts shown in current products use this token. You need a little test OKB to pay network
-          fees.
-        </p>
-        <label htmlFor="faucet-amount">Amount to receive</label>
-        <div className="quantity-input">
-          <input
-            id="faucet-amount"
-            inputMode="decimal"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={busy}
-          />
-          <span>tUSDG</span>
-        </div>
-        <p className="muted">
-          Your balance:{' '}
-          {connection && balances ? `${amount(balances.usdg)} tUSDG` : 'Connect your wallet to view'}
-        </p>
-        <button
-          className="button primary"
-          onClick={() => void claim()}
-          disabled={busy || config.mode !== 'gateway' || !market}
+        <a
+          className="button secondary"
+          href="https://web3.okx.com/xlayer/faucet/xlayerfaucet"
+          target="_blank"
+          rel="noreferrer"
         >
-          {busy ? 'Waiting for confirmation…' : connection ? 'Get test USDG' : 'Connect wallet to receive'}
-        </button>
-        {message && (
-          <p role="status" className="asset-message">
-            {message}
-          </p>
-        )}
-        <div className="test-asset-links">
-          <a href="https://web3.okx.com/xlayer/faucet/xlayerfaucet" target="_blank" rel="noreferrer">
-            Get test OKB ↗
-          </a>
-          {market && (
-            <a href={`${config.explorerUrl}/address/${market.usdg}`} target="_blank" rel="noreferrer">
-              tUSDG contract: {shortAddress(market.usdg)} ↗
-            </a>
-          )}
-        </div>
+          Get test OKB ↗
+        </a>
       </section>
+      <p className="test-asset-intro">
+        These X Layer Testnet tokens have no monetary value. You need a little test OKB to pay network fees.
+      </p>
+      <div className="test-assets-grid">
+        {assets.map((asset) => (
+          <section
+            key={asset.id}
+            id={asset.id}
+            className="test-asset-card"
+            aria-label={`Test ${asset.id === 'stock' ? 'NVIDIA' : 'USDG'} faucet`}
+          >
+            <span className="eyebrow">FOR {asset.strategy.toUpperCase()}</span>
+            <h2>
+              {asset.name} <span className="muted">· {asset.symbol}</span>
+            </h2>
+            <p>
+              {asset.id === 'stock'
+                ? 'Receive tNVDAx to try Sell High. During asset preparation, the app wraps the needed amount into twNVDAx with your wallet confirmation.'
+                : 'Mint tUSDG to try Buy Low. Deposit it at your target buying price and collect a premium upfront.'}
+            </p>
+            <p className="muted">No daily quota or waiting period.</p>
+            <label htmlFor={`faucet-${asset.id}`}>Amount of {asset.symbol} to receive</label>
+            <div className="quantity-input">
+              <input
+                id={`faucet-${asset.id}`}
+                inputMode="decimal"
+                value={inputs[asset.id]}
+                onChange={(e) => setInputs((previous) => ({ ...previous, [asset.id]: e.target.value }))}
+                disabled={!!busy}
+              />
+              <span>{asset.symbol}</span>
+            </div>
+            <p className="muted">
+              Your balance:{' '}
+              {connection && balances
+                ? `${amount(balances[asset.id], asset.decimals, asset.id === 'stock' ? 4 : 2)} ${asset.symbol}`
+                : connection
+                  ? balancesError
+                    ? 'Unavailable — refresh to retry'
+                    : 'Loading balance…'
+                  : 'Connect your wallet to view'}
+            </p>
+            <button
+              className="button primary"
+              onClick={() => void claim(asset.id)}
+              disabled={!!busy || config.mode !== 'gateway' || !market}
+            >
+              {busy === asset.id
+                ? 'Waiting for confirmation…'
+                : `Get test ${asset.id === 'stock' ? 'NVIDIA' : 'USDG'}`}
+            </button>
+            {messages[asset.id] && (
+              <p role="status" className="asset-message">
+                {messages[asset.id]}
+              </p>
+            )}
+            <div className="test-asset-links">
+              <Link className="text-link" href={asset.href}>
+                Try {asset.strategy} →
+              </Link>
+              {market && (
+                <a
+                  href={`${config.explorerUrl}/address/${market[asset.id]}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {asset.symbol} contract: {shortAddress(market[asset.id])} ↗
+                </a>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

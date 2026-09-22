@@ -20,7 +20,11 @@ test('test-token page validates amounts and asks the wallet to mint the selected
         data: request.params[0].data,
       });
       if (decoded.functionName === 'symbol')
-        result = encodeFunctionResult({ abi: faucetAbi, functionName: 'symbol', result: 'tUSDG' });
+        result = encodeFunctionResult({
+          abi: faucetAbi,
+          functionName: 'symbol',
+          result: request.params[0].to.toLowerCase() === deployment.stock.toLowerCase() ? 'tNVDAx' : 'tUSDG',
+        });
       if (decoded.functionName === 'nextPositionId')
         result = encodeFunctionResult({ abi: vaultAbi, functionName: 'nextPositionId', result: 1n });
     }
@@ -44,20 +48,34 @@ test('test-token page validates amounts and asks the wallet to mint the selected
   }, TEST_ACCOUNT);
   await page.goto('/');
   await page.getByRole('link', { name: 'Get test tokens', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Get test USDG.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Connect wallet to receive' }).click();
+  await expect(page.getByRole('heading', { name: 'Get test tokens.' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Test NVIDIA faucet' })).toBeVisible();
+  await page.getByRole('button', { name: 'Get test USDG', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
-  await page.getByLabel('Amount to receive').fill('1.0000001');
+  await page.getByLabel('Amount of tUSDG to receive').fill('1.0000001');
   await page.getByRole('button', { name: 'Get test USDG', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('up to 6 decimal places');
   expect(await page.evaluate(() => (window as any).faucetSends.length)).toBe(0);
-  await page.getByLabel('Amount to receive').fill('12345.123456');
+  await page.getByLabel('Amount of tUSDG to receive').fill('12345.123456');
   await page.getByRole('button', { name: 'Get test USDG', exact: true }).click();
   await expect(page.getByRole('status')).toContainText(/rejected|cancelled/i);
   const sent = await page.evaluate(() => (window as any).faucetSends[0]);
   expect(sent.to.toLowerCase()).toBe(deployment.usdg.toLowerCase());
   expect(decodeFunctionData({ abi: faucetAbi, data: sent.data }).args).toEqual([12345123456n]);
+  await page.getByLabel('Amount of tNVDAx to receive').fill('1.123456789123456789');
+  await page.getByRole('button', { name: 'Get test NVIDIA', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Test NVIDIA faucet' }).getByRole('status')).toContainText(
+    /rejected|cancelled/i,
+  );
+  const stockSent = await page.evaluate(() => (window as any).faucetSends[1]);
+  expect(stockSent.to.toLowerCase()).toBe(deployment.stockFaucet.toLowerCase());
+  expect(decodeFunctionData({ abi: faucetAbi, data: stockSent.data }).args).toEqual([1123456789123456789n]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await page.getByRole('link', { name: 'Try Sell High' }).click();
+  await expect(page.getByRole('heading', { name: 'Create Sell High order' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Sell High/ })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('link', { name: 'Get test NVIDIA', exact: true }).click();
+  await expect(page).toHaveURL(/\/faucet#stock$/);
 });
 
 test('browser fetch reaches gateway directly; an unfunded offer never creates a position', async ({

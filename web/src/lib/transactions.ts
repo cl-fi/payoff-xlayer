@@ -4,6 +4,7 @@ import {
   chainConfig,
   expectedFillData,
   faucetAbi,
+  stockFaucetAbi,
   fillEvent,
   publicClient,
   readBalances,
@@ -18,6 +19,7 @@ import type { Config } from './config';
 import type { Connection } from './wallet';
 import type { GatewayQuote, Market, Position, Preview } from './types';
 import deployment from '../../../config/xlayer-testnet.json';
+import type { FaucetAsset } from './faucet';
 
 export class TradingWallet {
   readonly client;
@@ -244,28 +246,48 @@ export class TradingWallet {
       transactionHash: receipt.transactionHash,
     } satisfies Position;
   }
-  async faucet(market: Market, amount: bigint) {
+  async faucet(market: Market, amount: bigint, asset: FaucetAsset = 'usdg') {
     await this.check();
     if (
       this.config.chainId !== 1952 ||
       market.usdg.toLowerCase() !== deployment.usdg.toLowerCase() ||
+      market.stock.toLowerCase() !== deployment.stock.toLowerCase() ||
       market.exchange.toLowerCase() !== deployment.exchange.toLowerCase() ||
       this.config.nvdaVault.toLowerCase() !== deployment.markets[0].vault.toLowerCase() ||
       amount <= 0n ||
       amount >= 2n ** 256n
     )
       throw new UserFacingError('The faucet does not match the current testnet deployment.');
+    const token = asset === 'stock' ? market.stock : market.usdg;
+    const target = asset === 'stock' ? (deployment.stockFaucet as Address) : market.usdg;
     const [symbol, decimals] = await Promise.all([
-      this.client.readContract({ address: market.usdg, abi: faucetAbi, functionName: 'symbol' }),
-      this.client.readContract({ address: market.usdg, abi: tokenAbi, functionName: 'decimals' }),
+      this.client.readContract({ address: token, abi: faucetAbi, functionName: 'symbol' }),
+      this.client.readContract({ address: token, abi: tokenAbi, functionName: 'decimals' }),
     ]);
-    if (symbol !== 'tUSDG' || decimals !== 6)
-      throw new UserFacingError('The Payoff test USDG faucet is unavailable.');
+    if (symbol !== (asset === 'stock' ? 'tNVDAx' : 'tUSDG') || decimals !== (asset === 'stock' ? 18 : 6))
+      throw new UserFacingError('The Payoff test token faucet is unavailable.');
+    if (asset === 'stock') {
+      const [stock, inventory] = await Promise.all([
+        this.client.readContract({ address: target, abi: stockFaucetAbi, functionName: 'stock' }),
+        this.client.readContract({
+          address: token,
+          abi: tokenAbi,
+          functionName: 'balanceOf',
+          args: [target],
+        }),
+      ]);
+      if (stock.toLowerCase() !== market.stock.toLowerCase())
+        throw new UserFacingError('The NVIDIA faucet does not match the current test stock.');
+      if (inventory < amount)
+        throw new UserFacingError(
+          'The NVIDIA faucet needs more test tokens. Try a smaller amount or try again later.',
+        );
+    }
     return this.send(
-      market.usdg,
+      target,
       encodeFunctionData({ abi: faucetAbi, functionName: 'faucet', args: [amount] }),
       'faucet',
-      'Test USDG minting',
+      asset === 'stock' ? 'Test NVIDIA claim' : 'Test USDG minting',
     );
   }
   async claim(position: Position) {

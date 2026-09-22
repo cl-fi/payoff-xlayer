@@ -432,7 +432,7 @@ summary:focus-visible {
   gap: 12px;
   padding: 12px 18px;
   text-align: left;
-  color: #838d85;
+  color: #46554d;
 }
 .strategy-tabs button span {
   font-weight: 600;
@@ -449,6 +449,10 @@ summary:focus-visible {
   background: white;
   border-color: #e2e7df;
   box-shadow: 0 2px 4px #14202a05;
+}
+.strategy-tabs button:hover {
+  background: #fff;
+  border-color: #d4ded6;
 }
 .strategy-content {
   padding: 31px 28px 23px;
@@ -2484,14 +2488,25 @@ input[type='checkbox'] {
   }
 }
 
+.test-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.test-asset-intro {
+  margin: 0 0 24px;
+  color: var(--muted);
+}
 .test-asset-card {
-  max-width: 760px;
+  min-width: 0;
+  scroll-margin-top: 140px;
   padding: 32px;
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 18px;
 }
 .test-asset-card h2 {
+  margin-top: 16px;
   margin-bottom: 16px;
 }
 .test-asset-card p {
@@ -2512,4 +2527,12 @@ input[type='checkbox'] {
 }
 .asset-message {
   overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .test-assets-grid {
+    grid-template-columns: 1fr;
+  }
+  .test-asset-card {
+    padding: 24px;
+  }
 }
