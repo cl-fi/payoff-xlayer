@@ -2,8 +2,63 @@ import { test, expect } from '@playwright/test';
 import { decodeFunctionData, encodeFunctionResult } from 'viem';
 import deployment from '../../config/xlayer-testnet.json' with { type: 'json' };
 import { fixtureRpc, TEST_ACCOUNT, TEST_NOW } from '../test/testnet-fixture';
-import { exchangeAbi, tokenAbi, vaultAbi, wrapperAbi } from '../src/lib/chain';
+import { exchangeAbi, faucetAbi, tokenAbi, vaultAbi, wrapperAbi } from '../src/lib/chain';
 import { referenceFixture } from '../test/reference-fixture';
+
+test('test-token page validates amounts and asks the wallet to mint the selected quantity', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(TEST_NOW);
+  await page.route('https://gateway.example.test/**', (route) => route.fulfill({ json: referenceFixture() }));
+  await page.route(deployment.rpcUrl, async (route) => {
+    const request = route.request().postDataJSON();
+    let result;
+    if (request.method === 'eth_estimateGas') result = '0x20000';
+    if (request.method === 'eth_call') {
+      const decoded = decodeFunctionData({
+        abi: [...vaultAbi, ...tokenAbi, ...wrapperAbi, ...exchangeAbi, ...faucetAbi],
+        data: request.params[0].data,
+      });
+      if (decoded.functionName === 'symbol')
+        result = encodeFunctionResult({ abi: faucetAbi, functionName: 'symbol', result: 'tUSDG' });
+      if (decoded.functionName === 'nextPositionId')
+        result = encodeFunctionResult({ abi: vaultAbi, functionName: 'nextPositionId', result: 1n });
+    }
+    await route.fulfill({ json: { jsonrpc: '2.0', id: request.id, result: result ?? fixtureRpc(request) } });
+  });
+  await page.addInitScript((account) => {
+    (window as any).faucetSends = [];
+    (window as any).ethereum = {
+      request: async ({ method, params }: any) => {
+        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [account];
+        if (method === 'eth_chainId') return '0x7a0';
+        if (method === 'eth_sendTransaction') {
+          (window as any).faucetSends.push(params[0]);
+          throw { code: 4001 };
+        }
+        throw new Error(method);
+      },
+      on() {},
+      removeListener() {},
+    };
+  }, TEST_ACCOUNT);
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Get test tokens', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Get test USDG.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Connect wallet to receive' }).click();
+  await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
+  await page.getByLabel('Amount to receive').fill('1.0000001');
+  await page.getByRole('button', { name: 'Get test USDG', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('up to 6 decimal places');
+  expect(await page.evaluate(() => (window as any).faucetSends.length)).toBe(0);
+  await page.getByLabel('Amount to receive').fill('12345.123456');
+  await page.getByRole('button', { name: 'Get test USDG', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText(/rejected|cancelled/i);
+  const sent = await page.evaluate(() => (window as any).faucetSends[0]);
+  expect(sent.to.toLowerCase()).toBe(deployment.usdg.toLowerCase());
+  expect(decodeFunctionData({ abi: faucetAbi, data: sent.data }).args).toEqual([12345123456n]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
 
 test('browser fetch reaches gateway directly; an unfunded offer never creates a position', async ({
   page,

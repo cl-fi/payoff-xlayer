@@ -87,7 +87,7 @@ export class SettlementChain {
       }
       markets.push({ vault: market.vault, symbol: market.symbol, wrappedStock: market.wrappedStock, ...inventory, positions });
     }
-    return jsonSafe({ chainId: this.config.chainId, dealer: this.dealer, observedAtMs: Date.now(),
+    return jsonSafe({ chainId: this.config.chainId, exchange: this.config.exchange, usdg: this.config.usdg, dealer: this.dealer, observedAtMs: Date.now(),
       blockNumber: block.number, blockTimestamp: block.timestamp, gasBalance, markets });
   }
   async exercisePlan(vault, id) {

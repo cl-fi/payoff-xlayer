@@ -33,7 +33,7 @@ export function referenceFixture(nowMs = Date.parse('2026-09-21T08:00:00Z')): Re
         marketDataMode: 'last_valid' as const,
         option: {
           symbol: m.symbol,
-          expiration: Number(s.id) < 13 ? '2026-09-25' : '2026-10-02',
+          expiration: new Date(Number(s.exerciseEnd) * 1000).toISOString().slice(0, 10),
           right: s.side === 0 ? ('put' as const) : ('call' as const),
           strikeMilli: (BigInt(s.strikePricePerWrappedUSDG) / 1000n).toString(),
         },

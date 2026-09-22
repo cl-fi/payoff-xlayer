@@ -3,6 +3,7 @@ import { UserFacingError } from './errors';
 import {
   chainConfig,
   expectedFillData,
+  faucetAbi,
   fillEvent,
   publicClient,
   readBalances,
@@ -16,6 +17,7 @@ import { isPrepared, type Storage } from './data/demo';
 import type { Config } from './config';
 import type { Connection } from './wallet';
 import type { GatewayQuote, Market, Position, Preview } from './types';
+import deployment from '../../../config/xlayer-testnet.json';
 
 export class TradingWallet {
   readonly client;
@@ -241,6 +243,30 @@ export class TradingWallet {
       status: 'open',
       transactionHash: receipt.transactionHash,
     } satisfies Position;
+  }
+  async faucet(market: Market, amount: bigint) {
+    await this.check();
+    if (
+      this.config.chainId !== 1952 ||
+      market.usdg.toLowerCase() !== deployment.usdg.toLowerCase() ||
+      market.exchange.toLowerCase() !== deployment.exchange.toLowerCase() ||
+      this.config.nvdaVault.toLowerCase() !== deployment.markets[0].vault.toLowerCase() ||
+      amount <= 0n ||
+      amount >= 2n ** 256n
+    )
+      throw new UserFacingError('The faucet does not match the current testnet deployment.');
+    const [symbol, decimals] = await Promise.all([
+      this.client.readContract({ address: market.usdg, abi: faucetAbi, functionName: 'symbol' }),
+      this.client.readContract({ address: market.usdg, abi: tokenAbi, functionName: 'decimals' }),
+    ]);
+    if (symbol !== 'tUSDG' || decimals !== 6)
+      throw new UserFacingError('The Payoff test USDG faucet is unavailable.');
+    return this.send(
+      market.usdg,
+      encodeFunctionData({ abi: faucetAbi, functionName: 'faucet', args: [amount] }),
+      'faucet',
+      'Test USDG minting',
+    );
   }
   async claim(position: Position) {
     await this.check();

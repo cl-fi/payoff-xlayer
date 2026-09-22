@@ -34,7 +34,7 @@ test('testnet discovers only the deployed catalog and reads fixed terms and bala
   const market = await adapter.market();
   assert.deepEqual(
     market.series.map((s) => s.id),
-    Array.from({ length: 16 }, (_, i) => String(i + 5)),
+    Array.from({ length: 16 }, (_, i) => String(i + 1)),
   );
   assert.equal(market.rate, '1000000000000000000');
   assert.equal(market.series[0].strikePricePerWrappedUSDG, '220000000');

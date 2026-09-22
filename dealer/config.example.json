@@ -1,14 +1,33 @@
 {
   "chainId": 1952,
-  "exchange": "0x8CBe4402aF2FD60A6BfeF7A4bC5697157f356f5f",
-  "usdg": "0xA78E2baaBaf5c4f36b7Fc394725Deb68D332EeC1",
-  "markets": [{
-    "vault": "0x7Ce218c4919F5F0DeE3D7068c652B9453Df83348",
-    "stock": "0x1DDa57B38E0461a29c0281497c15fb77657450Eb",
-    "wrappedStock": "0x691fFBCd11f0bA0B58D387B9f2649F6393b71E57",
-    "symbol": "NVDA",
-    "seriesIds": ["5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
-  }],
+  "exchange": "0x5eaDF32627f5482A59438Bd7741E1544126E5375",
+  "usdg": "0x56C62A3d7b0B7F0fC32F88635B4Ab140C02B3B53",
+  "markets": [
+    {
+      "vault": "0x7870568032eBF640EEd6582DCb31c112A164A221",
+      "stock": "0x1DDa57B38E0461a29c0281497c15fb77657450Eb",
+      "wrappedStock": "0x691fFBCd11f0bA0B58D387B9f2649F6393b71E57",
+      "symbol": "NVDA",
+      "seriesIds": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16"
+      ]
+    }
+  ],
   "premiumBps": 5000,
   "premiumBasis": "net",
   "quoteTtlSeconds": 30,

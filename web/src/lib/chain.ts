@@ -17,6 +17,10 @@ export const tokenAbi = parseAbi([
   'function allowance(address,address) view returns(uint256)',
   'function approve(address,uint256) returns(bool)',
 ]);
+export const faucetAbi = parseAbi([
+  'function faucet(uint256 amount)',
+  'function symbol() view returns(string)',
+]);
 export const wrapperAbi = parseAbi([
   'function asset() view returns(address)',
   'function convertToAssets(uint256) view returns(uint256)',

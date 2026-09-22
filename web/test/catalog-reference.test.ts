@@ -40,7 +40,7 @@ test('published catalog needs no network; formal inquiry verifies only its selec
   assert.deepEqual(reads, []);
   const preview = previewOrder('1', market.series[0], market, TEST_ACCOUNT);
   const checked = await adapter.selectedMarket(preview);
-  assert.deepEqual(reads, ['5']);
+  assert.deepEqual(reads, ['1']);
   assert.equal(checked.series.length, 1);
   await assert.rejects(
     adapter.selectedMarket({ ...preview, series: { ...preview.series, strikePricePerWrappedUSDG: '1' } }),

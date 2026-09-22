@@ -35,11 +35,11 @@ test('public references share formal pricing, preserve old bid timestamps and pe
   const reference = new ReferenceService(options);
   await Promise.all([reference.refresh(), reference.refresh()]);
   assert.equal(chainReads, 1); assert.equal(providerReads, 3); assert.equal(catalogReads, 1);
-  const put = reference.snapshot.quotes.find(q => q.seriesId === '5');
-  const call = reference.snapshot.quotes.find(q => q.seriesId === '8');
+  const put = reference.snapshot.quotes.find(q => q.seriesId === m.series[0].id);
+  const call = reference.snapshot.quotes.find(q => q.seriesId === m.series[1].id);
   assert.equal(put.netPremiumPerWrappedUSDG, '500000'); assert.equal(call.netPremiumPerWrappedUSDG, '500000');
   assert.equal(put.marketTimestampMs, originalTime); assert.equal(put.marketDataMode, 'last_valid');
-  assert.equal(reference.snapshot.quotes.find(q => q.seriesId === '6').status, 'unavailable');
+  assert.equal(reference.snapshot.quotes.find(q => q.seriesId === m.series[2].id).status, 'unavailable');
   const formal = priceQuote({ terms: put.terms, symbol: m.symbol, assetsPerWrapped: m.rate, stockQuantity: m.rate, feeBps: 100 }, await provider.quote(put.option), config);
   assert.equal(formal.netPremiumUSDG, put.netPremiumPerWrappedUSDG);
   assert.ok(!JSON.stringify(reference.snapshot).includes('signature'));
@@ -47,14 +47,14 @@ test('public references share formal pricing, preserve old bid timestamps and pe
   offline = true;
   const restarted = new ReferenceService({ ...options, provider: await LastValidBidProvider.open(upstream, join(dir, 'bids.json')) });
   await restarted.refresh();
-  assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === '5').marketTimestampMs, originalTime);
-  assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === '5').netPremiumPerWrappedUSDG, '500000');
-  assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === '6').status, 'unavailable');
+  assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === m.series[0].id).marketTimestampMs, originalTime);
+  assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === m.series[0].id).netPremiumPerWrappedUSDG, '500000');
+  assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === m.series[2].id).status, 'unavailable');
   // A different wrapped rate changes both native strike and native quantity, as in formal pricing.
   restarted.chain = { async referenceMarket() { return { vault: m.vault, rate: '2000000000000000000', feeBps: 100, blockNumber: '124', observedAtMs: Date.now() }; } };
   offline = false;
   await restarted.refresh();
-  const doubled = restarted.snapshot.quotes.find(q => q.seriesId === '5');
+  const doubled = restarted.snapshot.quotes.find(q => q.seriesId === m.series[0].id);
   assert.equal(doubled.option.strikeMilli, '110000'); assert.equal(doubled.netPremiumPerWrappedUSDG, '1000000');
   t.mock.timers.setTime(1790364600000);
   await restarted.refresh();

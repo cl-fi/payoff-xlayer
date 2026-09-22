@@ -72,9 +72,9 @@ export function fixtureRpc(request: RpcRequest): unknown {
       break;
     case 'getSeries': {
       const id = Number(args![0]);
-      if (id < 5 || id > 20) throw new Error(`Old or unknown series requested: ${id}`);
-      const index = (id - 5) % 8;
-      const end = id < 13 ? 1790366400n : 1790971200n;
+      if (id < 1 || id > 16) throw new Error(`Old or unknown series requested: ${id}`);
+      const index = (id - 1) % 8;
+      const end = id < 9 ? 1790366400n : 1790971200n;
       result = {
         side: index < 3 ? 0 : 1,
         strikePricePerWrappedUSDG: BigInt([220, 215, 210, 225, 230, 235, 240, 245][index]) * 1_000_000n,

@@ -56,6 +56,20 @@ test('settlement endpoint is private and read-only even if quote readiness is br
   assert.equal((await app.inject({ method: 'POST', url: '/settlement', headers: { authorization: 'Bearer private' } })).statusCode, 404);
 });
 
+test('a saved monitor snapshot cannot leak across a settlement deployment change', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'payoff-monitor-domain-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const path = join(dir, 'snapshot.json');
+  const oldConfig = { ...cfg, exchange: 'old-exchange', usdg: 'old-token' };
+  const oldChain = { dealer: 'maker', snapshot: async () => ({ ...snapshot, exchange: oldConfig.exchange, usdg: oldConfig.usdg }) };
+  await new SettlementMonitor({ config: oldConfig, chain: oldChain, path }).refresh();
+  const newMonitor = new SettlementMonitor({ config: { ...oldConfig, exchange: 'new-exchange', usdg: 'new-token' },
+    chain: { dealer: 'maker', snapshot: async () => { throw new Error('RPC unavailable'); } }, path });
+  await newMonitor.start(); await newMonitor.stop();
+  assert.equal(newMonitor.snapshot, null);
+  assert.equal(newMonitor.status().status, 'unavailable');
+});
+
 test('uncertain broadcast survives restart, blocks new nonces and only explicitly rebroadcasts the saved hash', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'payoff-manual-')); t.after(() => rm(dir, { recursive: true, force: true }));
   const account = privateKeyToAccount(`0x${'1'.padStart(64, '0')}`); // Public test-only key.

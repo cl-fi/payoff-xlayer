@@ -74,12 +74,12 @@ test('deployed dates and all strikes, real balances and unavailable quotes', asy
   await expect(dates).toContainText('Oct 2');
   await expect(prices.getByRole('button')).toHaveText(['220.00USDG', '215.00USDG', '210.00USDG']);
   await page.getByText('View settlement terms').click();
-  await expect(page.locator('.technical-details')).toContainText('Series #5');
+  await expect(page.locator('.technical-details')).toContainText('Series #1');
   await expect(page.locator('.technical-details')).toContainText('1 wNVDAx = 1 NVDAx');
   await expect(page.locator('.technical-details')).toContainText('EDT');
   await dates.getByRole('button', { name: /Oct 2/ }).click();
   await prices.getByRole('button', { name: '210.00 USDG' }).click();
-  await expect(page.locator('.technical-details')).toContainText('Series #15');
+  await expect(page.locator('.technical-details')).toContainText('Series #11');
   await page.getByRole('tab', { name: 'Sell High' }).click();
   await expect(prices.getByRole('button')).toHaveText([
     '225.00USDG',
@@ -89,7 +89,7 @@ test('deployed dates and all strikes, real balances and unavailable quotes', asy
     '245.00USDG',
   ]);
   await prices.getByRole('button', { name: '245.00 USDG' }).click();
-  await expect(page.locator('.technical-details')).toContainText('Series #20');
+  await expect(page.locator('.technical-details')).toContainText('Series #16');
   await connect(page);
   await expect(page.getByRole('button', { name: 'Quotes unavailable', exact: true })).toBeDisabled();
   await expect(page.locator('.available-balance')).toContainText('50.0000 NVDAx');

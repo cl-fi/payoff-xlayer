@@ -11,7 +11,7 @@ const activitySchema = z.object({
   to: address,
   data: hex,
   value: z.literal('0'),
-  kind: z.enum(['approval', 'wrap', 'fill', 'claim']),
+  kind: z.enum(['approval', 'wrap', 'fill', 'claim', 'faucet']),
   status: z.enum(['pending', 'confirmed', 'reverted', 'cancelled']),
   label: z.string(),
   requestId: hash.optional(),

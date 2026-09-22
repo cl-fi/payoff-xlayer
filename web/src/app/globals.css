@@ -2417,3 +2417,33 @@ input[type='checkbox'] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.test-asset-card {
+  max-width: 760px;
+  padding: 32px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.test-asset-card h2 {
+  margin-bottom: 16px;
+}
+.test-asset-card p {
+  line-height: 1.6;
+  margin: 16px 0;
+}
+.test-asset-card label {
+  display: block;
+  margin: 24px 0 10px;
+}
+.test-asset-card .quantity-input {
+  max-width: 420px;
+}
+.test-asset-links {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+}
+.asset-message {
+  overflow-wrap: anywhere;
+}

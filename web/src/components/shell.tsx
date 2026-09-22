@@ -38,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }) {
             ? 'Fixed test quotes · Simulated assets and trades. No onchain transactions.'
             : config.mode === 'testnet'
               ? 'Onchain series and wallet balances · Quote service not connected.'
-              : 'Test assets · 24/7 dealer quotes · Wallet-confirmed trades.'}
+              : 'Payoff tUSDG test assets · 24/7 dealer quotes · Wallet-confirmed trades.'}
         </span>
       </div>
       <header className="site-header">
@@ -53,6 +53,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {[
               { href: '/', label: 'Products' },
               { href: '/positions', label: 'My positions' },
+              ...(config.mode === 'gateway' ? [{ href: '/faucet', label: 'Get test tokens' }] : []),
               { href: '/how-it-works', label: 'How it works' },
             ].map((item) => (
               <Link

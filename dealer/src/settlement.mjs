@@ -78,7 +78,9 @@ export class SettlementMonitor {
     if (this.path) {
       try {
         const value = JSON.parse(await readFile(this.path, 'utf8'));
-        if (value.chainId === this.config.chainId && value.dealer.toLowerCase() === this.chain.dealer.toLowerCase()) this.snapshot = value;
+        if (value.chainId === this.config.chainId && value.exchange?.toLowerCase() === this.config.exchange?.toLowerCase()
+          && value.usdg?.toLowerCase() === this.config.usdg?.toLowerCase()
+          && value.dealer.toLowerCase() === this.chain.dealer.toLowerCase()) this.snapshot = value;
       } catch { /* A fresh confirmed-chain scan reconstructs all positions. */ }
     }
     void this.refresh();

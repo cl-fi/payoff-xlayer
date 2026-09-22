@@ -1,22 +1,22 @@
 {
   "version": 1,
   "chainId": 1952,
-  "exchange": "0x8CBe4402aF2FD60A6BfeF7A4bC5697157f356f5f",
-  "usdg": "0xA78E2baaBaf5c4f36b7Fc394725Deb68D332EeC1",
-  "generatedAt": "2026-09-22T06:30:43.043Z",
-  "blockNumber": "41599792",
+  "exchange": "0x5eaDF32627f5482A59438Bd7741E1544126E5375",
+  "usdg": "0x56C62A3d7b0B7F0fC32F88635B4Ab140C02B3B53",
+  "generatedAt": "2026-09-22T15:34:08.607Z",
+  "blockNumber": "41632404",
   "feeBps": 100,
   "markets": [
     {
-      "vault": "0x7Ce218c4919F5F0DeE3D7068c652B9453Df83348",
+      "vault": "0x7870568032eBF640EEd6582DCb31c112A164A221",
       "stock": "0x1DDa57B38E0461a29c0281497c15fb77657450Eb",
       "wrappedStock": "0x691fFBCd11f0bA0B58D387B9f2649F6393b71E57",
       "symbol": "NVDA",
       "rate": "1000000000000000000",
       "series": [
         {
-          "id": "5",
-          "label": "Series #5",
+          "id": "1",
+          "label": "Series #1",
           "side": 0,
           "strikePricePerWrappedUSDG": "220000000",
           "tradeCutoff": "1790364600",
@@ -24,8 +24,8 @@
           "exerciseEnd": "1790366400"
         },
         {
-          "id": "6",
-          "label": "Series #6",
+          "id": "2",
+          "label": "Series #2",
           "side": 0,
           "strikePricePerWrappedUSDG": "215000000",
           "tradeCutoff": "1790364600",
@@ -33,10 +33,46 @@
           "exerciseEnd": "1790366400"
         },
         {
-          "id": "7",
-          "label": "Series #7",
+          "id": "3",
+          "label": "Series #3",
           "side": 0,
           "strikePricePerWrappedUSDG": "210000000",
+          "tradeCutoff": "1790364600",
+          "exerciseStart": "1790364600",
+          "exerciseEnd": "1790366400"
+        },
+        {
+          "id": "4",
+          "label": "Series #4",
+          "side": 1,
+          "strikePricePerWrappedUSDG": "225000000",
+          "tradeCutoff": "1790364600",
+          "exerciseStart": "1790364600",
+          "exerciseEnd": "1790366400"
+        },
+        {
+          "id": "5",
+          "label": "Series #5",
+          "side": 1,
+          "strikePricePerWrappedUSDG": "230000000",
+          "tradeCutoff": "1790364600",
+          "exerciseStart": "1790364600",
+          "exerciseEnd": "1790366400"
+        },
+        {
+          "id": "6",
+          "label": "Series #6",
+          "side": 1,
+          "strikePricePerWrappedUSDG": "235000000",
+          "tradeCutoff": "1790364600",
+          "exerciseStart": "1790364600",
+          "exerciseEnd": "1790366400"
+        },
+        {
+          "id": "7",
+          "label": "Series #7",
+          "side": 1,
+          "strikePricePerWrappedUSDG": "240000000",
           "tradeCutoff": "1790364600",
           "exerciseStart": "1790364600",
           "exerciseEnd": "1790366400"
@@ -45,7 +81,7 @@
           "id": "8",
           "label": "Series #8",
           "side": 1,
-          "strikePricePerWrappedUSDG": "225000000",
+          "strikePricePerWrappedUSDG": "245000000",
           "tradeCutoff": "1790364600",
           "exerciseStart": "1790364600",
           "exerciseEnd": "1790366400"
@@ -53,42 +89,6 @@
         {
           "id": "9",
           "label": "Series #9",
-          "side": 1,
-          "strikePricePerWrappedUSDG": "230000000",
-          "tradeCutoff": "1790364600",
-          "exerciseStart": "1790364600",
-          "exerciseEnd": "1790366400"
-        },
-        {
-          "id": "10",
-          "label": "Series #10",
-          "side": 1,
-          "strikePricePerWrappedUSDG": "235000000",
-          "tradeCutoff": "1790364600",
-          "exerciseStart": "1790364600",
-          "exerciseEnd": "1790366400"
-        },
-        {
-          "id": "11",
-          "label": "Series #11",
-          "side": 1,
-          "strikePricePerWrappedUSDG": "240000000",
-          "tradeCutoff": "1790364600",
-          "exerciseStart": "1790364600",
-          "exerciseEnd": "1790366400"
-        },
-        {
-          "id": "12",
-          "label": "Series #12",
-          "side": 1,
-          "strikePricePerWrappedUSDG": "245000000",
-          "tradeCutoff": "1790364600",
-          "exerciseStart": "1790364600",
-          "exerciseEnd": "1790366400"
-        },
-        {
-          "id": "13",
-          "label": "Series #13",
           "side": 0,
           "strikePricePerWrappedUSDG": "220000000",
           "tradeCutoff": "1790969400",
@@ -96,8 +96,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "14",
-          "label": "Series #14",
+          "id": "10",
+          "label": "Series #10",
           "side": 0,
           "strikePricePerWrappedUSDG": "215000000",
           "tradeCutoff": "1790969400",
@@ -105,8 +105,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "15",
-          "label": "Series #15",
+          "id": "11",
+          "label": "Series #11",
           "side": 0,
           "strikePricePerWrappedUSDG": "210000000",
           "tradeCutoff": "1790969400",
@@ -114,8 +114,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "16",
-          "label": "Series #16",
+          "id": "12",
+          "label": "Series #12",
           "side": 1,
           "strikePricePerWrappedUSDG": "225000000",
           "tradeCutoff": "1790969400",
@@ -123,8 +123,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "17",
-          "label": "Series #17",
+          "id": "13",
+          "label": "Series #13",
           "side": 1,
           "strikePricePerWrappedUSDG": "230000000",
           "tradeCutoff": "1790969400",
@@ -132,8 +132,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "18",
-          "label": "Series #18",
+          "id": "14",
+          "label": "Series #14",
           "side": 1,
           "strikePricePerWrappedUSDG": "235000000",
           "tradeCutoff": "1790969400",
@@ -141,8 +141,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "19",
-          "label": "Series #19",
+          "id": "15",
+          "label": "Series #15",
           "side": 1,
           "strikePricePerWrappedUSDG": "240000000",
           "tradeCutoff": "1790969400",
@@ -150,8 +150,8 @@
           "exerciseEnd": "1790971200"
         },
         {
-          "id": "20",
-          "label": "Series #20",
+          "id": "16",
+          "label": "Series #16",
           "side": 1,
           "strikePricePerWrappedUSDG": "245000000",
           "tradeCutoff": "1790969400",
