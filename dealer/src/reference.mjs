@@ -59,6 +59,7 @@ export class ReferenceService {
     };
     // One Vault at a time; only two market-data workers, leaving capacity for formal RFQs.
     for (const market of catalog.markets) {
+      const configured = this.config.markets.find(m => same(m.vault, market.vault));
       const active = market.series.filter(s => Number(s.tradeCutoff) * 1000 > Date.now());
       if (!active.length) continue;
       let input;
@@ -75,7 +76,9 @@ export class ReferenceService {
           const base = { vault: market.vault, seriesId: terms.id, terms };
           let quote;
           try {
-            const context = { terms, symbol: market.symbol, assetsPerWrapped: input.rate };
+            if (!configured?.seriesIds.includes(terms.id)) throw new NoQuote('MARKET_NOT_LISTED');
+            const context = { terms, symbol: configured.symbol, assetsPerWrapped: input.rate,
+              referenceStrikeMilli: configured.referenceStrikes?.[terms.id] };
             const option = optionFor(context);
             const observation = await this.provider.quote(option);
             validateMarket(option, observation);

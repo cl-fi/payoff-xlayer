@@ -151,6 +151,10 @@ test('static products and public estimates need no RPC or wallet, and quantity/e
   });
   await page.goto('/');
   await expect(page.getByRole('group', { name: 'Choose a target price' }).getByRole('button')).toHaveCount(3);
+  await page
+    .getByRole('group', { name: 'Quantity unit' })
+    .getByRole('button', { name: 'wNVDAx', exact: true })
+    .click();
   await expect(page.getByTestId('reference-premium')).toHaveText('0.500000 USDG');
   await expect(page.getByTestId('reference-yield')).toHaveText('0.22%');
   await expect(page.getByText(/Last valid market bid/)).toContainText('Sep 18');
@@ -192,4 +196,27 @@ test('wallet RPC and reference outages cannot erase the published directory', as
   await expect(prices).toHaveCount(3);
   await expect(page.getByText('Wallet balances could not be loaded. Refresh to try again.')).toBeVisible();
   await expect(prices).toHaveCount(3);
+});
+
+test('public estimates scale with raw wrapped units at a non-unit rate without a wallet', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(TEST_NOW);
+  await page.route(deployment.rpcUrl, (route) => route.abort());
+  await page.route('https://gateway.example.test/**', (route) =>
+    route.fulfill({ json: referenceFixture(+TEST_NOW, '1003000000000000000') }),
+  );
+  await page.goto('/');
+  await expect(page.getByTestId('wrapping-rate')).toContainText('1 wNVDAx = 1.003 NVDAx');
+  await expect(page.getByTestId('reference-premium')).toHaveText('0.498504 USDG');
+  await page
+    .getByRole('group', { name: 'Quantity unit' })
+    .getByRole('button', { name: 'wNVDAx', exact: true })
+    .click();
+  await expect(page.getByTestId('reference-premium')).toHaveText('0.500000 USDG');
+  await expect(page.locator('.target-block')).toContainText('220.37');
+  await page.getByRole('tab', { name: /Sell High/ }).click();
+  await expect(page.getByTestId('reference-premium')).toHaveText('1.250000 USDG');
+  await expect(page.locator('.target-block')).toContainText('225.38');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });

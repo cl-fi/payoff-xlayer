@@ -40,7 +40,7 @@ test('published catalog needs no network; formal inquiry verifies only its selec
   assert.deepEqual(reads, []);
   const preview = previewOrder('1', market.series[0], market, TEST_ACCOUNT);
   const checked = await adapter.selectedMarket(preview);
-  assert.deepEqual(reads, ['1']);
+  assert.deepEqual(reads, [market.series[0].id]);
   assert.equal(checked.series.length, 1);
   await assert.rejects(
     adapter.selectedMarket({ ...preview, series: { ...preview.series, strikePricePerWrappedUSDG: '1' } }),
@@ -49,8 +49,8 @@ test('published catalog needs no network; formal inquiry verifies only its selec
 });
 
 test('reference estimates scale without a wallet and reject other terms, rates, future observations and closed series', () => {
-  const market = staticMarket(getConfig());
-  const snapshot = referenceFixture();
+  const market = { ...staticMarket(getConfig()), rate: '1000000000000000000' };
+  const snapshot = referenceFixture(+TEST_NOW, market.rate);
   const preview = previewOrder('2', market.series[0], market, TEST_ACCOUNT);
   const now = +TEST_NOW;
   const estimate = referenceEstimate(snapshot, preview, now)!;

@@ -39,6 +39,32 @@ After deployment, read back chain ID, deployed code, asset bindings, administrat
 
 ## Add series to an existing testnet Vault
 
+The native NVDAx target grid and fixed timestamps live in `config/nvda-products.testnet.json`.
+Run `node scripts/plan-testnet-series.mjs --output <local-plan.json>` to read one chain snapshot,
+convert native targets to wrapped strikes, and find reusable series. The output includes
+`forgeSignature` for `CreateTestnetSeries.run`. The plan does not sign transactions or modify
+the published catalog. Reuse the same fixed expiry when replacing a series after a rate change.
+After creation, verify receipts and the current rate, configure gateway/dealer admission,
+and update the frontend's `config/xlayer-testnet.json` active IDs. Then generate and publish
+the catalog. Keep the new series' real option reference strikes aligned to the native targets.
+The current publication policy does not cancel old quotes or disable old series onchain.
+Pre-public-test batches are disposable: keep only the new IDs in quoting configuration and
+do not add migration or compatibility branches for old test positions.
+
+To simulate the mainnet wrapping rate on the existing test wrapper, use
+`node scripts/align-testnet-wrapper.mjs` from the repository root for a read-only plan.
+After reviewing the plan, add `--broadcast --account <encrypted-foundry-account>
+--password-file <local-password-file> --cast <cast-executable>`. This reads mainnet only
+and sends a backing-token mint on chain 1952. It does not redeploy contracts or alter
+fixed position terms. Build the contracts first (`npm run build`) for the position ABI.
+The script rejects a rate decrease or an unrepresentable rate, records the source
+block and testnet receipt in `config/testnet-wrapper-rate.json`, and reads back the result.
+On interruption, inspect the printed transaction hash before retrying. Concurrent
+wrapper activity can change the resulting rate; a readback mismatch requires review,
+not an automatic retry. Deploy dealer reference-strike mappings first, then align
+the rate, run `npm run catalog:generate`, and publish the frontend.
+See the [design decision](../design/fixed-token-settlement.md) for the simulation's limits.
+
 Use `CreateTestnetSeries.s.sol` to add a reviewed batch without redeploying the Vault or Exchange. Its entry point is:
 
 ```text

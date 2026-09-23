@@ -32,6 +32,10 @@ The user keeps the premium in either outcome. Exercise is a dealer action, not a
 
 Settlement uses wrapped stock units. Dividends, splits and reverse splits can change the underlying stock quantity represented by those units; their underlying rights transfer with the wrapped tokens. The Vault does not separate dividends or adjust positions for corporate actions. A fixed wrapped quantity is not a fixed native stock-token quantity.
 
+See the [fixed-token settlement design decision](design/fixed-token-settlement.md) for the product rationale, accepted price drift, NVDAx/wNVDAx input units, pricing-reference limitations, and testnet rate simulation. Maintain these semantics when changing pricing, UI, or asset integrations.
+
+Product targets are specified per native NVDAx. A publication converts them to fixed wrapped strikes at the observed rate. After a rate change, replacement series retain the original expiry and become the frontend listings. Previous series and their positions remain valid; hiding an old listing does not revoke its outstanding quotes or block onchain entry.
+
 ## Architecture
 
 ```text

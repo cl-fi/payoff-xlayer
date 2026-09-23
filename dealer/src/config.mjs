@@ -10,6 +10,7 @@ export const configSchema = z.strictObject({
   markets: z.array(z.strictObject({
     vault: address, stock: address, wrappedStock: address, symbol: z.string().regex(/^[A-Z]{1,10}$/),
     seriesIds: z.array(uint).min(1),
+    referenceStrikes: z.record(uint, uint.refine(v => BigInt(v) > 0n)).optional(),
   })).min(1),
   premiumBps: z.number().int().min(1).max(10000).default(5000),
   premiumBasis: z.enum(['net', 'gross']).default('net'),
@@ -28,6 +29,10 @@ export const configSchema = z.strictObject({
 }).superRefine((c, ctx) => {
   if (new Set(c.markets.map(m => m.vault.toLowerCase())).size !== c.markets.length)
     ctx.addIssue({ code: 'custom', message: 'Duplicate Vault.' });
+  for (const market of c.markets) {
+    if (Object.keys(market.referenceStrikes ?? {}).some(id => !market.seriesIds.includes(id)))
+      ctx.addIssue({ code: 'custom', message: 'Reference strikes must belong to listed series.' });
+  }
 });
 export async function loadConfig() {
   const config = configSchema.parse(JSON.parse(await readFile(process.env.DEALER_CONFIG_PATH ?? 'config.local.json', 'utf8')));

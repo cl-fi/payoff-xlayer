@@ -1,7 +1,7 @@
 import { UserFacingError } from './errors';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import { strikeAmountUSDG } from '../../../sdk/wrapped-assets.mjs';
-import type { Market, Preview, ProductSeries } from './types';
+import type { Market, Preview, ProductSeries, QuantityUnit } from './types';
 export const WAD = 10n ** 18n;
 export const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
 
@@ -17,17 +17,21 @@ export function previewOrder(
   series: ProductSeries,
   market: Market,
   account: Address,
+  unit: QuantityUnit = 'stock',
 ): Preview {
-  const requestedStock = parseQuantity(input);
-  const quantity = (requestedStock * WAD) / BigInt(market.rate);
+  const inputQuantity = parseQuantity(input);
+  const rate = BigInt(market.rate);
+  if (rate <= 0n) throw new UserFacingError('The wrapping rate is unavailable. Please try again later.');
+  const quantity = unit === 'wrapped' ? inputQuantity : (inputQuantity * WAD) / rate;
   if (quantity === 0n)
     throw new UserFacingError('This quantity converts to less than one smallest wrapped token unit.');
   const strike = strikeAmountUSDG(quantity, series.strikePricePerWrappedUSDG);
   return {
     order: { taker: account, vault: series.vault, seriesId: series.id, wrappedQuantity: quantity.toString() },
     series,
-    requestedStock: requestedStock.toString(),
-    stockEquivalent: ((quantity * BigInt(market.rate)) / WAD).toString(),
+    inputQuantity: inputQuantity.toString(),
+    inputUnit: unit,
+    stockEquivalent: ((quantity * rate) / WAD).toString(),
     wrappedQuantity: quantity.toString(),
     strikeAmountUSDG: strike.toString(),
     rate: market.rate,

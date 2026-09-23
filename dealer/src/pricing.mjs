@@ -8,10 +8,17 @@ export const same = (a, b) => a.toLowerCase() === b.toLowerCase();
 const nyDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
 export function optionFor(context) {
   const { terms, assetsPerWrapped, symbol } = context;
-  const numerator = BigInt(terms.strikePricePerWrappedUSDG) * WAD;
-  const denominator = BigInt(assetsPerWrapped) * 1000n;
-  if (denominator <= 0n || numerator % denominator !== 0n) throw new NoQuote('NO_EXACT_STRIKE');
-  const strikeMilli = numerator / denominator;
+  // An explicit reference is a pricing input, never a replacement for fixed onchain terms.
+  // Without one, retain strict matching; do not silently round to a listed stock strike.
+  let strikeMilli;
+  if (context.referenceStrikeMilli !== undefined) {
+    strikeMilli = BigInt(context.referenceStrikeMilli);
+  } else {
+    const numerator = BigInt(terms.strikePricePerWrappedUSDG) * WAD;
+    const denominator = BigInt(assetsPerWrapped) * 1000n;
+    if (denominator <= 0n || numerator % denominator !== 0n) throw new NoQuote('NO_EXACT_STRIKE');
+    strikeMilli = numerator / denominator;
+  }
   if (strikeMilli <= 0n) throw new NoQuote('NO_EXACT_STRIKE');
   return { symbol, expiration: nyDate.format(new Date(Number(terms.exerciseEnd) * 1000)),
     right: terms.side === 0 ? 'put' : 'call', strikeMilli: strikeMilli.toString(),

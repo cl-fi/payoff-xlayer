@@ -16,6 +16,8 @@ test('public references share formal pricing, preserve old bid timestamps and pe
   catalog.generatedAt = '2026-09-21T00:00:00Z';
   catalog.markets[0].series = [catalog.markets[0].series[0], catalog.markets[0].series[3], catalog.markets[0].series[1]];
   const m = catalog.markets[0];
+  m.rate = '1000000000000000000'; // Stable fixture, independent of the published rate snapshot.
+  for (let i = 0; i < m.series.length; i++) m.series[i].strikePricePerWrappedUSDG = String([220, 225, 215][i] * 1000000);
   const config = configSchema.parse({ chainId: catalog.chainId, exchange: catalog.exchange, usdg: catalog.usdg,
     markets: [{ ...m, series: undefined, rate: undefined, seriesIds: m.series.map(s => s.id) }].map(({ series, rate, ...v }) => v) });
   let offline = false, chainReads = 0, providerReads = 0, catalogReads = 0;
@@ -56,6 +58,17 @@ test('public references share formal pricing, preserve old bid timestamps and pe
   await restarted.refresh();
   const doubled = restarted.snapshot.quotes.find(q => q.seriesId === m.series[0].id);
   assert.equal(doubled.option.strikeMilli, '110000'); assert.equal(doubled.netPremiumPerWrappedUSDG, '1000000');
+  config.markets[0].referenceStrikes = Object.fromEntries(m.series.map(s => [s.id, (BigInt(s.strikePricePerWrappedUSDG) / 1000n).toString()]));
+  restarted.chain = { async referenceMarket() { return { vault: m.vault, rate: '1001701196801074000', feeBps: 100, blockNumber: '125', observedAtMs: Date.now() }; } };
+  await restarted.refresh();
+  for (const s of m.series.slice(0, 2)) {
+    const q = restarted.snapshot.quotes.find(q => q.seriesId === s.id);
+    assert.equal(q.option.strikeMilli, config.markets[0].referenceStrikes[s.id]);
+    const signedPricing = priceQuote({ terms: s, symbol: m.symbol, referenceStrikeMilli: config.markets[0].referenceStrikes[s.id],
+      assetsPerWrapped: '1001701196801074000', stockQuantity: '1001701196801074000', feeBps: 100 }, await provider.quote(q.option), config);
+    assert.equal(q.netPremiumPerWrappedUSDG, '500850');
+    assert.equal(signedPricing.netPremiumUSDG, q.netPremiumPerWrappedUSDG);
+  }
   t.mock.timers.setTime(1790364600000);
   await restarted.refresh();
   assert.equal(restarted.snapshot.quotes.length, 0);

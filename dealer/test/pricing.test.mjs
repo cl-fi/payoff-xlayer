@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { calculatePremium, marketDataMode, optionFor, priceQuote, NoQuote } from '../src/pricing.mjs';
+import { configSchema } from '../src/config.mjs';
+import configExample from '../config.example.json' with { type: 'json' };
 
 const config = { premiumBps: 5000, premiumBasis: 'net', maxQuoteAgeSeconds: 30, quoteTtlSeconds: 30 };
 const now = Date.parse('2026-09-21T16:00:00Z');
@@ -47,6 +49,26 @@ test('invalid bids, future timestamps, wrong contracts and expiry mismatches sti
     [{ expiration: '2026-10-02' }, 'MARKET_CONTRACT_MISMATCH'],
     [{ expirationCloseMs: market.expirationCloseMs - 3600000 }, 'EXPIRY_TIME_MISMATCH'],
   ]) assert.throws(() => priceQuote(context, { ...market, ...override }, config, now), code(expected));
+});
+test('explicit reference survives rate drift for both sides without changing settlement strike', () => {
+  for (const side of [0, 1]) {
+    const c = { ...context, referenceStrikeMilli: '220000', assetsPerWrapped: 1001701196801074000n,
+      stockQuantity: 1001701196801074000n, terms: { ...context.terms, side } };
+    const m = { ...market, right: side === 0 ? 'put' : 'call' };
+    assert.equal(optionFor(c).strikeMilli, '220000');
+    assert.equal(priceQuote(c, m, config, now).netPremiumUSDG, '500850');
+    assert.equal(c.terms.strikePricePerWrappedUSDG, 220000000n);
+    assert.throws(() => priceQuote(c, { ...m, strikeMilli: '219000' }, config, now), code('MARKET_CONTRACT_MISMATCH'));
+    assert.throws(() => priceQuote(c, { ...m, expirationCloseMs: m.expirationCloseMs - 3600000 }, config, now), code('EXPIRY_TIME_MISMATCH'));
+  }
+});
+test('reference configuration rejects nonpositive strikes and unknown series', () => {
+  const first = configExample.markets[0].seriesIds[0];
+  assert.equal(configSchema.parse(configExample).markets[0].referenceStrikes[first], '220000');
+  for (const referenceStrikes of [{ [first]: '0' }, { [first]: '-1' }, { '999': '220000' }]) {
+    const c = structuredClone(configExample); c.markets[0].referenceStrikes = referenceStrikes;
+    assert.throws(() => configSchema.parse(c));
+  }
 });
 test('stale, overnight and weekend bids receive new short-lived quotes with original market timestamps', () => {
   for (const at of [now + 30000, Date.parse('2026-09-21T23:00:00Z'), Date.parse('2026-09-22T08:00:00Z')]) {

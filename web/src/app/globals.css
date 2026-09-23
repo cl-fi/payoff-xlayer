@@ -744,6 +744,25 @@ summary:focus-visible {
   border-radius: 50%;
   color: var(--teal);
 }
+.quantity-units {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.quantity-units button {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.quantity-units button[aria-pressed='true'] {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  color: var(--teal);
+}
 .quantity-input {
   display: flex;
   border: 1px solid #dce1da;

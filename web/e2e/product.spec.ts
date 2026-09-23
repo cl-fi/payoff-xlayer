@@ -138,3 +138,42 @@ test('selecting the 14-day series uses its actual terms and premium', async ({ p
   await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('Buy Low · 14 days');
   await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.6650');
 });
+
+for (const side of ['Buy Low', 'Sell High'] as const) {
+  test(`${side}: wrapped input prices and settles exact wrapped units`, async ({ page }) => {
+    await connect(page);
+    if (side === 'Sell High') await page.getByRole('tab', { name: 'Sell High' }).click();
+    const order = page.getByRole('region', { name: 'Create order' });
+    await expect(order.locator('.target-block')).toContainText(side === 'Buy Low' ? '175.00' : '185.00');
+    await page
+      .getByRole('group', { name: 'Quantity unit' })
+      .getByRole('button', { name: 'wNVDAx', exact: true })
+      .click();
+    await expect(page.getByLabel('Stock quantity')).toHaveValue('1');
+    await expect(order.locator('.target-block')).toContainText(side === 'Buy Low' ? '175.52' : '185.55');
+    await expect(page.locator('#quantity-help')).toContainText('1.003000 NVDAx');
+    await expect(page.getByTestId('wrapping-rate')).toContainText('1 wNVDAx = 1.003 NVDAx');
+    await quote(page);
+    await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('1.000000 wNVDAx');
+    await fill(page);
+    await page.getByRole('button', { name: new RegExp(`NVDAx · ${side} Demo position`) }).click();
+    await expect(page.getByRole('dialog')).toContainText('1.000000 wNVDAx');
+  });
+}
+
+test('changing units discards a pending quote even when the typed number is unchanged', async ({ page }) => {
+  await connect(page);
+  await page.getByRole('button', { name: 'Prepare assets', exact: true }).click();
+  await page.getByRole('button', { name: 'Simulate asset preparation', exact: true }).click();
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Quantity unit' })
+    .getByRole('button', { name: 'wNVDAx', exact: true })
+    .click();
+  await page.clock.runFor(2000);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByLabel('Stock quantity')).toHaveValue('1');
+  await expect(page.getByRole('button', { name: 'Prepare assets', exact: true })).toBeVisible();
+});

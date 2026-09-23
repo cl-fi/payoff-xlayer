@@ -76,6 +76,28 @@ test('invalid, underflowing and overflowing amounts are rejected', () => {
     assert.throws(() => preview(0, input));
   assert.throws(() => preview(0, '0.000000000000000001'));
 });
+test('native and wrapped inputs express the same order at a non-unit rate; direct units retain 18-digit precision', () => {
+  for (const side of [0, 1] as const) {
+    const series = market.series.find((s) => s.side === side)!;
+    const native = previewOrder('1.003', series, market, DEMO_ACCOUNT, 'stock');
+    const wrapped = previewOrder('1', series, market, DEMO_ACCOUNT, 'wrapped');
+    assert.deepEqual(native.order, wrapped.order);
+    assert.equal(wrapped.wrappedQuantity, WAD.toString());
+    assert.equal(wrapped.stockEquivalent, '1003000000000000000');
+    assert.equal(wrapped.strikeAmountUSDG, native.strikeAmountUSDG);
+    assert.equal(wrapped.strikeAmountUSDG, series.strikePricePerWrappedUSDG);
+    assert.equal(
+      previewOrder('1.000000000000000001', series, market, DEMO_ACCOUNT, 'wrapped').wrappedQuantity,
+      (WAD + 1n).toString(),
+    );
+    assert.throws(
+      () => previewOrder('1', series, { ...market, rate: '0' }, DEMO_ACCOUNT, 'wrapped'),
+      /wrapping rate/,
+    );
+    for (const input of ['0', '-1', '1e2', '1.0000000000000000001'])
+      assert.throws(() => previewOrder(input, series, market, DEMO_ACCOUNT, 'wrapped'));
+  }
+});
 for (const side of [0, 1] as const)
   for (const outcome of ['exercised', 'expired'] as const) {
     test(`${side === 0 ? 'put' : 'call'} → ${outcome}: collateral, premium and claim reconcile`, () => {

@@ -1,9 +1,11 @@
 import { decodeFunctionData, encodeFunctionResult, type Hex } from 'viem';
 import deployment from '../../config/xlayer-testnet.json' with { type: 'json' };
+import catalog from '../public/catalog.json' with { type: 'json' };
 import { exchangeAbi, tokenAbi, vaultAbi, wrapperAbi } from '../src/lib/chain';
 
 export const TEST_ACCOUNT = '0x0000000000000000000000000000000000001234';
 export const TEST_NOW = new Date('2026-09-21T08:00:00Z');
+export const TEST_RATE = catalog.markets[0].rate;
 const abi = [...vaultAbi, ...exchangeAbi, ...tokenAbi, ...wrapperAbi];
 export type RpcRequest = { method: string; params?: unknown[] };
 export function fixtureRpc(request: RpcRequest): unknown {
@@ -53,7 +55,7 @@ export function fixtureRpc(request: RpcRequest): unknown {
       result = deployment.stock;
       break;
     case 'convertToAssets':
-      result = 10n ** 18n;
+      result = (BigInt(args![0] as bigint) * BigInt(TEST_RATE)) / 10n ** 18n;
       break;
     case 'feeBps':
       result = 100;
@@ -71,16 +73,15 @@ export function fixtureRpc(request: RpcRequest): unknown {
       result = call.to.toLowerCase() === deployment.usdg.toLowerCase() ? 10_000_000n : 50n * 10n ** 18n;
       break;
     case 'getSeries': {
-      const id = Number(args![0]);
-      if (id < 1 || id > 16) throw new Error(`Old or unknown series requested: ${id}`);
-      const index = (id - 1) % 8;
-      const end = id < 9 ? 1790366400n : 1790971200n;
+      const id = String(args![0]);
+      const series = catalog.markets[0].series.find((s) => s.id === id);
+      if (!series) throw new Error(`Unpublished or unknown series requested: ${id}`);
       result = {
-        side: index < 3 ? 0 : 1,
-        strikePricePerWrappedUSDG: BigInt([220, 215, 210, 225, 230, 235, 240, 245][index]) * 1_000_000n,
-        tradeCutoff: end - 1800n,
-        exerciseStart: end - 1800n,
-        exerciseEnd: end,
+        side: series.side,
+        strikePricePerWrappedUSDG: BigInt(series.strikePricePerWrappedUSDG),
+        tradeCutoff: BigInt(series.tradeCutoff),
+        exerciseStart: BigInt(series.exerciseStart),
+        exerciseEnd: BigInt(series.exerciseEnd),
       };
       break;
     }

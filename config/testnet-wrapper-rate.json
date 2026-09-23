@@ -1,0 +1,24 @@
+{
+  "source": {
+    "chainId": 196,
+    "wrapper": "0xa8ddb5cd96b5222afe198316e9a57caa642850d5",
+    "blockNumber": "71390614",
+    "timestamp": "1790159650",
+    "rate": "1001701196801074000"
+  },
+  "target": {
+    "chainId": 1952,
+    "wrapper": "0x691fFBCd11f0bA0B58D387B9f2649F6393b71E57",
+    "stock": "0x1DDa57B38E0461a29c0281497c15fb77657450Eb",
+    "beforeBlock": "41700814",
+    "assets": "153002200000000000000",
+    "supply": "153002200000000000000",
+    "donation": "260286853197284363"
+  },
+  "transactionHash": "0x5b4e130a985aca8a0318760ca85ca142baedae96010d1e67ce02eb69e7ed0ca7",
+  "blockNumber": "41700833",
+  "actualRate": "1001701196801074000",
+  "checkedExistingPositions": 5,
+  "observedAt": "2026-09-23T10:34:40.182Z",
+  "mode": "one-time-testnet-backing-donation"
+}

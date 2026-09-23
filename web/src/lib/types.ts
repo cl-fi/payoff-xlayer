@@ -3,6 +3,7 @@ import type { Order, Quote, Selection, Settlement, Series } from '../../../gatew
 export type { Order, Quote, Selection, Settlement };
 
 export type Mode = 'demo' | 'testnet' | 'gateway';
+export type QuantityUnit = 'stock' | 'wrapped';
 export type Scenario = 'normal' | 'no-quote' | 'expired' | 'rejected' | 'failed' | 'offline';
 export type ProductSeries = Series & { id: string; days: number; vault: Address; label: string };
 export type Market = {
@@ -27,7 +28,8 @@ export type Balances = {
 export type Preview = {
   order: Order;
   series: ProductSeries;
-  requestedStock: string;
+  inputQuantity: string;
+  inputUnit: QuantityUnit;
   stockEquivalent: string;
   wrappedQuantity: string;
   strikeAmountUSDG: string;

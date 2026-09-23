@@ -7,7 +7,7 @@ import { Modal } from './modal';
 import { DEMO_ACCOUNT, DemoAdapter, isPrepared } from '@/lib/data/demo';
 import { amount, dateOnly, dateTime, precise, previewOrder, ratio, stockTarget } from '@/lib/amounts';
 import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
-import { quoteTerms, type AppQuote, type Position } from '@/lib/types';
+import { quoteTerms, type AppQuote, type Position, type QuantityUnit } from '@/lib/types';
 import { friendlyError, switchNetwork } from '@/lib/wallet';
 import { GatewayAdapter } from '@/lib/data/gateway';
 import { TradingWallet } from '@/lib/transactions';
@@ -36,7 +36,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const [side, setSide] = useState<0 | 1>(initialSide),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
     [selectedExpiry, setSelectedExpiry] = useState<string | null>(null),
-    [quantity, setQuantity] = useState('1');
+    [quantity, setQuantity] = useState('1'),
+    [quantityUnit, setQuantityUnit] = useState<QuantityUnit>('stock');
   const [quote, setQuote] = useState<AppQuote | null>(null),
     [dialog, setDialog] = useState<'assets' | 'quote' | 'success' | null>(null);
   const [busy, setBusy] = useState(''),
@@ -69,13 +70,13 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     if (!market || !series) return { preview: null, error: '' };
     try {
       return {
-        preview: previewOrder(quantity, series, market, connection?.address ?? DEMO_ACCOUNT),
+        preview: previewOrder(quantity, series, market, connection?.address ?? DEMO_ACCOUNT, quantityUnit),
         error: '',
       };
     } catch (e) {
       return { preview: null, error: friendlyError(e) };
     }
-  }, [quantity, series, market, connection?.address]);
+  }, [quantity, quantityUnit, series, market, connection?.address]);
   const preview = calculation.preview,
     prepared = !!(balances && preview && isPrepared(balances, preview));
   const estimate = referenceEstimate(references, preview, now);
@@ -94,7 +95,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     setAccepted(false);
     setMessage('');
     setBusy('');
-  }, [quantity, side, series?.id, market?.rate, connection?.address, scenario, revision]);
+  }, [quantity, quantityUnit, side, series?.id, market?.rate, connection?.address, scenario, revision]);
   useEffect(
     () => () => {
       operation.current++;
@@ -205,6 +206,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     void inquire();
   };
   const isPut = side === 0;
+  const wrappedInput = quantityUnit === 'wrapped';
   return (
     <div className="page product-page">
       <section className="page-intro">
@@ -371,7 +373,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           {pricedSeries.length > 0 && (
             <>
               <div className="field-label" id="strike-label">
-                Choose a target price <span>USDG per NVDAx equivalent</span>
+                Choose a target price <span>USDG per {wrappedInput ? 'wNVDAx' : 'NVDAx equivalent'}</span>
               </div>
               <div className="strike-options" role="group" aria-labelledby="strike-label">
                 {pricedSeries.map((s) => (
@@ -381,7 +383,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                     className={s.id === series?.id ? 'selected' : ''}
                     onClick={() => setSelectedSeries(s.id)}
                   >
-                    {market && amount(stockTarget(s, market.rate))}
+                    {market &&
+                      amount(wrappedInput ? s.strikePricePerWrappedUSDG : stockTarget(s, market.rate))}
                     <small>USDG</small>
                   </button>
                 ))}
@@ -391,18 +394,31 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           <div className="target-block">
             <div>
               <span className="field-label">
-                Reference {isPut ? 'buy' : 'sell'} price <span>per NVDAx</span>
+                {wrappedInput ? 'Fixed' : 'Reference'} {isPut ? 'buy' : 'sell'} price{' '}
+                <span>per {wrappedInput ? 'wNVDAx' : 'NVDAx'}</span>
               </span>
               <strong>
-                {series && market ? amount(stockTarget(series, market.rate)) : '—'} <small>USDG</small>
+                {series && market
+                  ? amount(wrappedInput ? series.strikePricePerWrappedUSDG : stockTarget(series, market.rate))
+                  : '—'}{' '}
+                <small>USDG</small>
               </strong>
             </div>
             <span className="target-icon">
               <Icon name={isPut ? 'down' : 'up'} size={24} />
             </span>
           </div>
+          <div className="quantity-units" role="group" aria-label="Quantity unit">
+            <button type="button" aria-pressed={!wrappedInput} onClick={() => setQuantityUnit('stock')}>
+              NVDAx
+            </button>
+            <button type="button" aria-pressed={wrappedInput} onClick={() => setQuantityUnit('wrapped')}>
+              wNVDAx
+            </button>
+          </div>
           <label className="field-label" htmlFor="quantity">
-            Stock quantity <span>At the current exchange rate</span>
+            Stock quantity{' '}
+            <span>{wrappedInput ? 'Fixed wrapped units' : 'At the current exchange rate'}</span>
           </label>
           <div className={`quantity-input ${calculation.error ? 'invalid' : ''}`}>
             <input
@@ -414,7 +430,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               aria-describedby={calculation.error ? 'quantity-error' : 'quantity-help'}
               onChange={(e) => setQuantity(e.target.value)}
             />
-            <span>NVDAx</span>
+            <span>{wrappedInput ? 'wNVDAx' : 'NVDAx'}</span>
           </div>
           {calculation.error ? (
             <p id="quantity-error" className="field-error">
@@ -422,10 +438,20 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             </p>
           ) : (
             <p id="quantity-help" className="input-help">
-              ≈ {preview ? amount(preview.wrappedQuantity, 18, 6) : '—'} wNVDAx. Settlement uses this fixed
-              quantity.
+              {wrappedInput
+                ? `≈ ${preview ? amount(preview.stockEquivalent, 18, 6) : '—'} NVDAx at the current rate. Settlement uses your fixed wNVDAx quantity.`
+                : `≈ ${preview ? amount(preview.wrappedQuantity, 18, 6) : '—'} wNVDAx. Settlement uses this fixed quantity.`}
             </p>
           )}
+          <p className="input-help" data-testid="wrapping-rate">
+            1 wNVDAx = {market ? precise(market.rate) : '—'} NVDAx.
+            {series &&
+              market &&
+              (wrappedInput
+                ? ` Current equivalent target: ${amount(stockTarget(series, market.rate), 6, 4)} USDG per NVDAx.`
+                : ` Fixed target: ${precise(series.strikePricePerWrappedUSDG, 6)} USDG per wNVDAx.`)}{' '}
+            The NVDAx equivalent can change; wrapped settlement terms stay fixed.
+          </p>
           <div className="order-summary">
             <div>
               <span>{isPut ? 'USDG to lock' : 'Wrapped stocks to lock'}</span>

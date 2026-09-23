@@ -6,7 +6,7 @@ import { chainConfig, wrapperAbi, vaultAbi, exchangeAbi, tokenAbi } from '../src
 import { runtimeSchema } from '../src/lib/config';
 import { TestnetAdapter } from '../src/lib/data/testnet';
 import { previewOrder } from '../src/lib/amounts';
-import { fixtureRpc, TEST_ACCOUNT, type RpcRequest } from './testnet-fixture';
+import { fixtureRpc, TEST_ACCOUNT, TEST_RATE, type RpcRequest } from './testnet-fixture';
 
 const config = runtimeSchema.parse({
   mode: 'testnet',
@@ -34,11 +34,11 @@ test('testnet discovers only the deployed catalog and reads fixed terms and bala
   const market = await adapter.market();
   assert.deepEqual(
     market.series.map((s) => s.id),
-    Array.from({ length: 16 }, (_, i) => String(i + 1)),
+    deployment.markets[0].seriesIds,
   );
-  assert.equal(market.rate, '1000000000000000000');
-  assert.equal(market.series[0].strikePricePerWrappedUSDG, '220000000');
-  assert.equal(market.series[7].strikePricePerWrappedUSDG, '245000000');
+  assert.equal(market.rate, TEST_RATE);
+  assert.equal(market.series[0].strikePricePerWrappedUSDG, '220374264');
+  assert.equal(market.series[7].strikePricePerWrappedUSDG, '245416794');
   assert.equal(market.series[15].exerciseEnd, '1790971200');
   assert.equal(market.feeBps, 100);
   for (const request of requests.filter((r) => r.method === 'eth_call'))
@@ -49,7 +49,9 @@ test('testnet discovers only the deployed catalog and reads fixed terms and bala
   assert.equal(balances.wrapped, '50000000000000000000');
   assert.equal(balances.okb, '200000000000000000');
   const preview = previewOrder('2', market.series[0], market, TEST_ACCOUNT);
-  assert.equal(preview.strikeAmountUSDG, '440000000');
+  const nativeTargetTotal = 440000000n;
+  const rounding = BigInt(preview.strikeAmountUSDG) - nativeTargetTotal;
+  assert.ok(rounding >= 0n && rounding <= 2n, 'two NVDAx settle at 440 USDG, within micro-unit rounding');
   await assert.rejects(adapter.quote(preview, 'test-key'), /quote service is not connected/);
 });
 

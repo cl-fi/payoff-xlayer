@@ -23,6 +23,13 @@ Browsers call `GET https://api.payoff.finance/v1/reference-quotes` immediately a
 
 Each reference is normalized to one wrapped token, net of protocol fees. The browser scales by the user's wrapped quantity using integer arithmetic. Small rounding differences and quantity-dependent maker pricing can make formal quotes differ. Term yield is net premium divided by USDG collateral for Buy Low, or the agreed sale proceeds for Sell High; it is not annualized or a return based on the stock's live market value.
 
+Listing targets originate in native NVDAx units (`config/nvda-products.testnet.json`). Publication
+converts those targets using the current wrapper rate, then lists only the selected generation
+of onchain Series in `catalog.json`. Replacement series keep the same expiry. Do not relabel an
+old wrapped strike as a new native price, and do not add old test-series compatibility branches.
+Removing a listing does not revoke signed quotes or delete chain records. See the
+[publication policy](../design/fixed-token-settlement.md#批次发布与切换).
+
 The UI shows the original market timestamp and distinguishes live from last-valid bids. A calculation timestamp never makes an old observation fresh. Unavailable contracts are isolated; provider outages can use the persisted last valid bid for the exact option. Reference-service failures retain the last displayed estimate with a delayed-update notice. Catalog, references, balances, receipt recovery and history load independently; connecting a wallet never clears products.
 
 The assets tNVDAx and twNVDAx are deployment test tokens, not issuer-backed stocks. USDG amounts in this deployment use Payoff Test USDG (`tUSDG`), a project-owned token with 6 decimals. The **Get test tokens** page (`/faucet`) offers both tUSDG for Buy Low and 18-decimal tNVDAx for Sell High. Both are claimed with a direct wallet transaction and use the normal receipt/recovery flow, with no per-wallet quota or cooldown; test OKB gas is needed. USDG is minted by `TestnetUSDG.faucet(amount)`. The existing stock has an immutable administrator-only minter, so `TestnetStockFaucet.faucet(amount)` dispenses a pre-funded inventory of that same stock; its address is in `config/xlayer-testnet.json`. The administrator can replenish it with `TestnetStock.mint(faucetAddress, amount)`. An oversized claim or depleted inventory produces an explicit error, not a false success. These tokens have no monetary value.
@@ -75,7 +82,8 @@ The gateway adapter uses the static directory for browsing, and verifies only th
 
 ## Amounts and settlement
 
-- Stock input converts at the current wrapping rate into a fixed wrapped quantity W, rounded down.
+- The quantity selector accepts NVDAx or wNVDAx. NVDAx input converts at the current wrapping rate into a fixed wrapped quantity W, rounded down; wNVDAx input is W directly, with full 18-decimal precision. Switching units retains the typed number and invalidates any quote, including in-flight responses.
+- Target prices follow the chosen unit: current NVDAx-equivalent reference price, or fixed USDG per wNVDAx. Both modes show the wrapping rate and the other price unit. The native-equivalent target can change without changing Series or Position settlement terms; see the [design decision](../design/fixed-token-settlement.md).
 - The USDG amount U uses the same rounding-up rule as the SDK and contracts. Expand the settlement details to view full precision.
 - Buy Low locks U; Sell High locks W. Both pay the net premium upfront.
 - On exercise, Buy Low receives W and Sell High receives U. Without exercise, each returns its original collateral.

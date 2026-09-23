@@ -1,6 +1,9 @@
 import raw from '../public/catalog.json' with { type: 'json' };
 import { catalogSchema, type ReferenceSnapshot } from '../../sdk/catalog.mjs';
-export function referenceFixture(nowMs = Date.parse('2026-09-21T08:00:00Z')): ReferenceSnapshot {
+export function referenceFixture(
+  nowMs = Date.parse('2026-09-21T08:00:00Z'),
+  rate = raw.markets[0].rate,
+): ReferenceSnapshot {
   const c = catalogSchema.parse(raw);
   return {
     version: 1,
@@ -12,7 +15,7 @@ export function referenceFixture(nowMs = Date.parse('2026-09-21T08:00:00Z')): Re
     maxQuoteAgeMs: 30000,
     markets: c.markets.map((m) => ({
       vault: m.vault,
-      rate: m.rate,
+      rate,
       feeBps: c.feeBps,
       blockNumber: c.blockNumber,
       observedAtMs: nowMs,
@@ -24,7 +27,7 @@ export function referenceFixture(nowMs = Date.parse('2026-09-21T08:00:00Z')): Re
         terms: s,
         status: 'available' as const,
         netPremiumPerWrappedUSDG: s.side === 0 ? '500000' : '1250000',
-        assetsPerWrapped: m.rate,
+        assetsPerWrapped: rate,
         calculatedAtMs: nowMs,
         marketTimestampMs: Date.parse('2026-09-18T19:59:00Z'),
         marketOpenMs: Date.parse('2026-09-18T13:30:00Z'),

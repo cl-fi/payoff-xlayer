@@ -46,6 +46,7 @@ export class DealerChain {
       throw new NoQuote('MARKET_CONFIGURATION');
     if (paused || vaultPaused || !allowed || !dealerAllowed || terms.tradeCutoff <= now) throw new NoQuote('MARKET_UNAVAILABLE');
     return { ...market, terms, feeBps, assetsPerWrapped, stockQuantity, blockNumber: block.number,
+      referenceStrikeMilli: market.referenceStrikes?.[order.seriesId],
       timestamp: block.timestamp.toString(), strikeAmountUSDG: strikeAmountUSDG(order.wrappedQuantity, terms.strikePricePerWrappedUSDG).toString() };
   }
   async funded(gross, blockNumber) {

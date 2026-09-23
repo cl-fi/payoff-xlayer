@@ -11,7 +11,7 @@ allowances, alerts, transaction recovery and commands.
 
 `src/reference.mjs` runs in this same process, with separate responsibilities from formal `/quote` requests. It reads the static frontend `/catalog.json` on startup and every `catalogRefreshMs` (default 5 minutes). It keeps the last valid catalog in the dealer volume, with a bundled catalog for initial deployment. Neither browsing nor formal RFQs waits on that website. Wrong-chain catalogs are rejected.
 
-Every `referenceIntervalMs` (default 30 seconds), it reads mutable chain inputs once per active Vault, then prices the published Series with the shared exact-option matching, last-valid-bid provider and premium calculation. Two background workers leave capacity for formal inquiries. Cycles cannot overlap. There are no taker balances, approvals, maker-funding checks, nonce creation or signatures in this path.
+Every `referenceIntervalMs` (default 30 seconds), it reads mutable chain inputs once per active Vault, then prices the published Series with the shared reference-option selection, last-valid-bid provider and premium calculation. Two background workers leave capacity for formal inquiries. Cycles cannot overlap. There are no taker balances, approvals, maker-funding checks, nonce creation or signatures in this path.
 
 `GET /reference-quotes` returns the already computed snapshot to the authenticated gateway. It includes per-wrapped-token net premiums, rate/fee snapshots, original market observation times, calculation times and per-Series availability. The gateway exposes it publicly at `/v1/reference-quotes`. Missing data for one option does not suppress other options. A closed Series is removed on refresh and also filtered by the frontend clock. The 50% policy is configurable platform reference pricing, not a limit on competing dealers.
 
@@ -19,19 +19,25 @@ The snapshot is rebuilt in memory; the underlying last-valid bids and catalog su
 
 ## Formal pricing rule
 
-Buy Low sells a put; Sell High sells a call. Match the configured underlying symbol, the series expiry date in New York and the exact stock-equivalent strike. There is no nearest-strike or nearest-expiry fallback.
+Buy Low sells a put; Sell High sells a call. Match the configured underlying symbol and the series expiry date in New York. Each market can explicitly configure `referenceStrikes[seriesId]`, in thousandths of a dollar (e.g. `"1": "220000"`). This fixes the selected listed option as a **pricing reference**, while the onchain wrapped strike stays unchanged. Public references and signed RFQs use the same mapping. Without an explicit mapping, require an exact stock-equivalent strike; there is no nearest-strike or nearest-expiry fallback.
+
+For replacement series, configure the reference strike from the product's native NVDAx target,
+not from its converted wrapped strike. Current pre-public-test deployments replace the quote
+allowlist with the newly published batch; old test series need no migration or quote compatibility.
+Existing chain signatures are not revoked by this configuration change. Settlement monitoring
+still reads Vault positions independently of the quote allowlist.
 
 ```text
 stock quantity = wrapper.convertToAssets(requested wrapped quantity)
-stock strike   = series wrapped strike / current assets per wrapped unit
+reference strike = configured referenceStrikes[seriesId], or exact wrapped strike / current rate
 target premium = floor(market bid per share × stock quantity × 50%, to 6 decimals)
 ```
 
 The default `premiumBasis: "net"` makes the target the user's net USDG receipt. For a $1 bid and one stock-equivalent unit, the user receives 0.500000 USDG; with a 1% Exchange fee the dealer pays 0.505050 USDG, including 0.005050 USDG protocol fee. Set `premiumBasis: "gross"` if the target should be before fees instead: gross 0.500000, fee 0.005000, net 0.495000. All financial arithmetic uses integers; the fee matches Solidity's floor rounding. USD and USDG are assumed 1:1 for this initial pricing rule.
 
-Option bid is quoted **per share**. Do not multiply by the standard listed-option contract size of 100. Fractional wrapped quantities are supported. The wrapper and its underlying must both use 18 decimals, matching the current protocol. A stock-equivalent strike that is not exactly representable on the option strike grid declines rather than silently rounding.
+Option bid is quoted **per share**. Do not multiply by the standard listed-option contract size of 100. Fractional wrapped quantities are supported. The wrapper and its underlying must both use 18 decimals, matching the current protocol. A missing or invalid bid for the selected reference declines; another strike is never silently substituted. Configure reference mappings deliberately when publishing new series.
 
-The current testnet uses test NVDA assets with a 1:1 wrapper. A listed NVDA option is a pricing reference: it does not have identical exercise, token/custody or corporate-action terms to this Vault product. This service does not model those differences, IV, Greeks, inventory, hedging, funding, splits or dividends. It does not trade at a broker, hedge or exercise positions automatically.
+The testnet wrapper can be aligned to a recorded mainnet conversion-rate snapshot by adding test backing assets. It is not permanently 1:1. A listed NVDA option is a pricing reference: it does not have identical exercise, strike, token/custody or corporate-action terms to this Vault product. This service does not model those differences, IV, Greeks, inventory, hedging, funding, splits or dividends. Reassess the reference mapping after material rate changes or corporate actions. It does not trade at a broker, hedge or exercise positions automatically. See the [settlement design decision](../design/fixed-token-settlement.md).
 
 ## 24/7 reference bids and failure behavior
 
