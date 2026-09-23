@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useProduct } from './provider';
 import { Icon } from './icon';
 import { Modal } from './modal';
+import { TokenIcon } from './token-icon';
 import { DemoAdapter, claimAmounts, positionStatus } from '@/lib/data/demo';
 import { amount, dateTime, precise, WAD } from '@/lib/amounts';
 import { friendlyError } from '@/lib/wallet';
@@ -106,10 +107,7 @@ function TradingPositions() {
     <div className="page positions-page">
       <section className="page-intro">
         <div>
-          <div className="eyebrow">
-            <span className="teal-line" /> YOUR POSITIONS
-          </div>
-          <h1>Every position, at a glance.</h1>
+          <h1>Your portfolio, at a glance.</h1>
           <p>Track your premiums, settlement terms and assets ready to claim.</p>
         </div>
         <Link href="/" className="button secondary">
@@ -196,13 +194,13 @@ function TradingPositions() {
                 : 'Choose a price that works for you and try your first Buy Low or Sell High order.'}
             </p>
             <Link href="/" className="button primary">
-              Explore products <Icon name="arrow" size={16} />
+              Explore Dual Investment <Icon name="arrow" size={16} />
             </Link>
           </div>
         ) : (
           <div className="position-table">
             <div className="table-heading">
-              <span>Product / strategy</span>
+              <span>Strategy</span>
               <span>Fixed settlement terms</span>
               <span>Net premium</span>
               <span>Expiry</span>
@@ -219,7 +217,7 @@ function TradingPositions() {
                 }}
               >
                 <span className="table-product">
-                  <span className="mini-avatar">N</span>
+                  <TokenIcon symbol="NVDAx" size={28} />
                   <span>
                     <strong>NVDAx · {p.series.side === 0 ? 'Buy Low' : 'Sell High'}</strong>
                     <small>
@@ -253,7 +251,7 @@ function TradingPositions() {
       {balances && (
         <section className="balance-panel">
           <div>
-            <div className="eyebrow">{config.mode === 'demo' ? 'DEMO BALANCE' : 'WALLET BALANCE'}</div>
+            <div className="eyebrow">{config.mode === 'demo' ? 'Demo balance' : 'Wallet balance'}</div>
             <h2>Available assets</h2>
             <p>
               {config.mode === 'demo'
@@ -261,18 +259,21 @@ function TradingPositions() {
                 : 'Available balances from the latest onchain check.'}
             </p>
           </div>
-          <div>
-            <strong>{amount(balances.usdg)}</strong>
-            <span>USDG</span>
-          </div>
-          <div>
-            <strong>{amount(balances.stock, 18, 4)}</strong>
-            <span>NVDAx</span>
-          </div>
-          <div>
-            <strong>{amount(balances.wrapped, 18, 6)}</strong>
-            <span>wNVDAx</span>
-          </div>
+          {(
+            [
+              ['USDG', amount(balances.usdg)],
+              ['NVDAx', amount(balances.stock, 18, 4)],
+              ['wNVDAx', amount(balances.wrapped, 18, 6)],
+            ] as const
+          ).map(([symbol, value]) => (
+            <div key={symbol}>
+              <strong>{value}</strong>
+              <span>
+                <TokenIcon symbol={symbol} size={14} />
+                {symbol}
+              </span>
+            </div>
+          ))}
         </section>
       )}
       {config.mode === 'gateway' && (
@@ -287,7 +288,7 @@ function TradingPositions() {
           if (!busy) setSelected(null);
         }}
         title={`NVDAx · ${position?.series.side === 0 ? 'Buy Low' : 'Sell High'}`}
-        eyebrow="POSITION DETAILS"
+        eyebrow="Position details"
       >
         {position && status && (
           <>

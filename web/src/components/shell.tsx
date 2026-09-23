@@ -22,25 +22,17 @@ export function Shell({ children }: { children: ReactNode }) {
     { value: 'failed', label: 'Failed trade', hint: 'Simulate a failed trade with assets unchanged' },
     { value: 'offline', label: 'Service unavailable', hint: 'Simulate an unavailable quote service' },
   ];
+  const environment =
+    config.mode === 'demo'
+      ? 'Product demo · Fixed test quotes, simulated assets and trades. No onchain transactions.'
+      : config.mode === 'testnet'
+        ? 'X Layer Testnet · Onchain series and wallet balances. Quote service not connected.'
+        : 'X Layer Testnet · Payoff tUSDG test assets, 24/7 dealer quotes, wallet-confirmed trades.';
   return (
     <>
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
-      <div className="environment-strip">
-        <span className="environment-label">
-          <span className="environment-dot" />
-          {config.mode === 'demo' ? 'Product demo' : 'X Layer Testnet'}
-        </span>
-        <span className="strip-divider" />
-        <span className="environment-message">
-          {config.mode === 'demo'
-            ? 'Fixed test quotes · Simulated assets and trades. No onchain transactions.'
-            : config.mode === 'testnet'
-              ? 'Onchain series and wallet balances · Quote service not connected.'
-              : 'Payoff tUSDG test assets · 24/7 dealer quotes · Wallet-confirmed trades.'}
-        </span>
-      </div>
       <header className="site-header">
         <div className="header-inner">
           <Link className="brand" href="/" aria-label="Payoff home">
@@ -51,8 +43,8 @@ export function Shell({ children }: { children: ReactNode }) {
           </Link>
           <nav aria-label="Main navigation">
             {[
-              { href: '/', label: 'Products' },
-              { href: '/positions', label: 'My positions' },
+              { href: '/', label: 'Dual Investment' },
+              { href: '/positions', label: 'Portfolio' },
               ...(config.mode === 'gateway' ? [{ href: '/faucet', label: 'Get test tokens' }] : []),
               { href: '/how-it-works', label: 'How it works' },
             ].map((item) => (
@@ -72,11 +64,10 @@ export function Shell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="header-actions">
-            <span className="network-label">
-              <span className="network-dot" />
-              {config.mode === 'demo' ? 'Demo environment' : 'X Layer Testnet'}
+            <span className="env-pill" title={environment}>
+              {config.mode === 'demo' ? 'Demo' : 'Testnet'}
             </span>
-            <button className="button wallet-button" onClick={() => setWalletOpen(true)}>
+            <button className="button secondary wallet-button" onClick={() => setWalletOpen(true)}>
               <Icon name="wallet" size={17} />
               <span>
                 {connection
@@ -128,39 +119,26 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <footer className="site-footer">
-        <div className="footer-top">
-          <Link className="brand" href="/">
-            <Mark size={23} />
-            <span>Payoff.</span>
-          </Link>
-          <p>Your target price. Clear settlement terms.</p>
-          <span className="built-on">
-            BUILT ON <strong>X LAYER</strong>
-          </span>
-        </div>
         <div className="footer-bottom">
-          <span>
+          <span title={environment}>
             © {new Date().getFullYear()} Payoff ·{' '}
-            {config.mode === 'demo' ? 'Product demo. Quotes do not reflect live markets.' : 'Testnet version'}
+            {config.mode === 'demo' ? 'Product demo' : 'X Layer Testnet'}
           </span>
-          <div>
-            <Link href="/how-it-works">
-              Understand the rules <Icon name="external" size={12} />
-            </Link>
-            {config.mode === 'demo' && (
+          {config.mode === 'demo' && (
+            <div>
               <button onClick={() => setSettings(true)}>
                 <Icon name="settings" size={14} />
                 Demo settings{scenario !== 'normal' && <span className="tiny-dot" />}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </footer>
       <Modal
         open={settings}
         onClose={() => setSettings(false)}
         title="Explore different outcomes"
-        eyebrow="DEMO CONTROLS"
+        eyebrow="Demo controls"
       >
         <p className="muted modal-intro">
           These settings only affect this local demo. Wallet and onchain assets are unchanged.

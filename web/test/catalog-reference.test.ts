@@ -5,7 +5,7 @@ import { GatewayAdapter } from '../src/lib/data/gateway';
 import { staticMarket } from '../src/lib/data/catalog';
 import { getConfig } from '../src/lib/config';
 import { previewOrder } from '../src/lib/amounts';
-import { referenceEstimate } from '../src/lib/data/reference';
+import { referenceEstimate, referenceQuote } from '../src/lib/data/reference';
 import { referenceFixture } from './reference-fixture';
 import { fixtureRpc, TEST_ACCOUNT, TEST_NOW } from './testnet-fixture';
 import { vaultAbi } from '../src/lib/chain';
@@ -55,6 +55,15 @@ test('reference estimates scale without a wallet and reject other terms, rates, 
   const now = +TEST_NOW;
   const estimate = referenceEstimate(snapshot, preview, now)!;
   assert.equal(estimate.netPremiumUSDG, '1000000');
+  assert.equal(
+    referenceQuote(snapshot, market.series[0], market.rate, now)?.netPremiumPerWrappedUSDG,
+    '500000',
+  );
+  assert.equal(referenceQuote(snapshot, market.series[0], '2000000000000000000', now), null);
+  assert.equal(
+    referenceQuote(snapshot, market.series[0], market.rate, Number(market.series[0].tradeCutoff) * 1000),
+    null,
+  );
   assert.equal(estimate.live, false);
   assert.equal(referenceEstimate(snapshot, { ...preview, rate: '2000000000000000000' }, now), null);
   assert.equal(

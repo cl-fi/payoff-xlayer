@@ -42,12 +42,23 @@ export function amount(value: string | bigint, decimals = 6, places = 2) {
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return places ? `${grouped}.${fraction.padEnd(places, '0').slice(0, places)}` : grouped;
 }
+// Rounded (half-up) display for derived quantities, so a typed 1 NVDAx does not show as 0.9999.
+export function rounded(value: string | bigint, decimals: number, places: number) {
+  const scale = 10n ** BigInt(decimals - places);
+  return amount((BigInt(value) + scale / 2n) / scale, places, places);
+}
 export function precise(value: string | bigint, decimals = 18) {
   return formatUnits(BigInt(value), decimals);
 }
-export function ratio(numerator: string, denominator: string) {
-  if (BigInt(denominator) === 0n) return '0.00';
-  return amount((BigInt(numerator) * 10000n) / BigInt(denominator), 2, 2);
+// Simple (non-compounded) annualization over the time left until the exercise window closes, in basis points.
+export function aprBps(numerator: string, denominator: string, secondsToExpiry: number) {
+  const basis = BigInt(denominator) * BigInt(Math.floor(secondsToExpiry));
+  if (basis <= 0n) return null;
+  return (BigInt(numerator) * 10000n * 31536000n) / basis;
+}
+export function apr(numerator: string, denominator: string, secondsToExpiry: number) {
+  const bps = aprBps(numerator, denominator, secondsToExpiry);
+  return bps === null ? null : amount(bps, 2, 2);
 }
 export function stockTarget(series: ProductSeries, rate: string) {
   return ceilDiv(BigInt(series.strikePricePerWrappedUSDG) * WAD, BigInt(rate));

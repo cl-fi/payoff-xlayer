@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useProduct } from './provider';
+import { TokenIcon } from './token-icon';
 import { TradingWallet } from '@/lib/transactions';
 import { parseFaucetAmount, type FaucetAsset } from '@/lib/faucet';
 import { amount, shortAddress } from '@/lib/amounts';
@@ -55,7 +56,7 @@ export function FaucetPage() {
       message(
         asset === 'stock'
           ? 'Test NVIDIA received. Open Sell High to wrap your tokens and prepare an order.'
-          : 'Test USDG received. You can now use it in Buy Low products.',
+          : 'Test USDG received. You can now use it for Buy Low orders.',
       );
     } catch (e) {
       message(friendlyError(e));
@@ -68,9 +69,6 @@ export function FaucetPage() {
     <div className="page positions-page">
       <section className="page-intro">
         <div>
-          <div className="eyebrow">
-            <span className="teal-line" /> TEST ASSETS
-          </div>
           <h1>Get test tokens.</h1>
           <p>Get USDG for Buy Low, or NVIDIA test tokens for Sell High.</p>
         </div>
@@ -94,8 +92,9 @@ export function FaucetPage() {
             className="test-asset-card"
             aria-label={`Test ${asset.id === 'stock' ? 'NVIDIA' : 'USDG'} faucet`}
           >
-            <span className="eyebrow">FOR {asset.strategy.toUpperCase()}</span>
+            <span className="eyebrow">For {asset.strategy}</span>
             <h2>
+              <TokenIcon symbol={asset.symbol} size={24} />
               {asset.name} <span className="muted">· {asset.symbol}</span>
             </h2>
             <p>

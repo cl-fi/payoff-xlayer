@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useProduct } from './provider';
 import { Icon } from './icon';
+import { TokenIcon } from './token-icon';
 import { amount, shortAddress } from '@/lib/amounts';
 
 export function TestnetPortfolio() {
@@ -16,14 +17,11 @@ export function TestnetPortfolio() {
     <div className="page positions-page">
       <section className="page-intro">
         <div>
-          <div className="eyebrow">
-            <span className="teal-line" /> YOUR TESTNET ACCOUNT
-          </div>
           <h1>Your assets, on X Layer.</h1>
           <p>View wallet balances and explore the deployed strategies.</p>
         </div>
         <Link href="/" className="button secondary">
-          Explore products <Icon name="arrow" size={16} />
+          Explore Dual Investment <Icon name="arrow" size={16} />
         </Link>
       </section>
       <section className="positions-section">
@@ -54,7 +52,10 @@ export function TestnetPortfolio() {
             <div className="testnet-assets" aria-label="Testnet wallet balances" aria-busy={loading}>
               {assets.map((asset) => (
                 <div key={asset.symbol}>
-                  <span>{asset.symbol}</span>
+                  <span>
+                    <TokenIcon symbol={asset.symbol} size={16} />
+                    {asset.symbol}
+                  </span>
                   <strong>
                     {asset.value === undefined ? '—' : amount(asset.value, asset.decimals, asset.precision)}
                   </strong>

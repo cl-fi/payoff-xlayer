@@ -5,7 +5,7 @@ export default function NotFound() {
       <span className="eyebrow">404</span>
       <h1>This page does not exist</h1>
       <Link className="button primary" href="/">
-        Back to products
+        Back to Dual Investment
       </Link>
     </div>
   );

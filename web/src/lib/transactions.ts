@@ -228,7 +228,7 @@ export class TradingWallet {
       event.args.taker.toLowerCase() !== this.connection.address.toLowerCase() ||
       event.args.vault.toLowerCase() !== preview.order.vault.toLowerCase()
     )
-      throw new UserFacingError('The transaction was mined. Refresh My positions to check its outcome.');
+      throw new UserFacingError('The transaction was mined. Refresh Portfolio to check its outcome.');
     // Chain receipt is authoritative even if the receipt-reporting endpoint is temporarily down.
     await adapter.settlement(checked.requestId, receipt.transactionHash).catch(() => {});
     return {

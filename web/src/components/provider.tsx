@@ -362,7 +362,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         open={walletOpen}
         onClose={() => setWalletOpen(false)}
         title={connection ? 'Your account' : 'Get started'}
-        eyebrow="YOUR WALLET"
+        eyebrow="Your wallet"
       >
         {connection ? (
           <>

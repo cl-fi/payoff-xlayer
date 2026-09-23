@@ -16,7 +16,7 @@ async function fill(page: Page) {
   await dialog.getByRole('checkbox').check();
   await dialog.getByRole('button', { name: 'Confirm demo trade' }).click();
   await expect(page.getByText('Demo position created. ')).toBeVisible();
-  await page.getByRole('link', { name: 'View my positions' }).click();
+  await page.getByRole('link', { name: 'View portfolio' }).click();
 }
 async function scenario(page: Page, name: string) {
   await page.getByRole('button', { name: 'Demo settings' }).click();
@@ -63,7 +63,7 @@ test('no quote, expired and cancelled confirmations never create a position', as
   await page.getByRole('button', { name: 'Confirm demo trade' }).click();
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Simulated cancellation');
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByRole('link', { name: 'My positions', exact: true }).click();
+  await page.getByRole('link', { name: 'Portfolio', exact: true }).click();
   await expect(page.locator('.position-row')).toHaveCount(0);
 });
 test('quote countdown really expires and changed quantity invalidates previous quote', async ({ page }) => {
@@ -73,9 +73,9 @@ test('quote countdown really expires and changed quantity invalidates previous q
   await page.clock.fastForward(91000);
   await expect(page.getByText('Quote expired', { exact: true })).toBeVisible();
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
-  await page.getByLabel('Stock quantity').fill('2');
+  await page.getByLabel('Quantity', { exact: true }).fill('2');
   await expect(page.getByRole('button', { name: 'Prepare assets', exact: true })).toBeVisible();
-  await page.getByLabel('Stock quantity').fill('0');
+  await page.getByLabel('Quantity', { exact: true }).fill('0');
   await expect(page.locator('#quantity-error')).toBeVisible();
   await expect(page.locator('.main-cta')).toBeDisabled();
 });
@@ -108,11 +108,11 @@ test('real injected wallet in demo is never asked to sign or send; account chang
     'eth_requestAccounts',
     'eth_chainId',
   ]);
-  await page.getByRole('link', { name: 'Products', exact: true }).click();
+  await page.getByRole('link', { name: 'Dual Investment', exact: true }).click();
   await quote(page);
   await page.evaluate(() => (window as unknown as { emitAccount: () => void }).emitAccount());
   await expect(page.getByRole('dialog')).not.toBeVisible();
-  await page.getByRole('link', { name: 'My positions', exact: true }).click();
+  await page.getByRole('link', { name: 'Portfolio', exact: true }).click();
   await expect(page.locator('.position-row')).toHaveCount(0);
 });
 test('all routes fit viewport, keyboard dialog closes and screenshots render', async ({ page }, info) => {
@@ -133,7 +133,8 @@ test('all routes fit viewport, keyboard dialog closes and screenshots render', a
 
 test('selecting the 14-day series uses its actual terms and premium', async ({ page }) => {
   await connect(page);
-  await page.getByRole('button', { name: /^14 days/ }).click();
+  await page.getByRole('button', { name: /14 days/ }).click();
+  await expect(page.locator('.order-selection')).toHaveText('175.00 USDG · 14 days');
   await quote(page);
   await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('Buy Low · 14 days');
   await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.6650');
@@ -144,15 +145,22 @@ for (const side of ['Buy Low', 'Sell High'] as const) {
     await connect(page);
     if (side === 'Sell High') await page.getByRole('tab', { name: 'Sell High' }).click();
     const order = page.getByRole('region', { name: 'Create order' });
-    await expect(order.locator('.target-block')).toContainText(side === 'Buy Low' ? '175.00' : '185.00');
+    await expect(order.locator('.order-selection')).toContainText(side === 'Buy Low' ? '175.00' : '185.00');
     await page
       .getByRole('group', { name: 'Quantity unit' })
       .getByRole('button', { name: 'wNVDAx', exact: true })
       .click();
-    await expect(page.getByLabel('Stock quantity')).toHaveValue('1');
-    await expect(order.locator('.target-block')).toContainText(side === 'Buy Low' ? '175.52' : '185.55');
+    await expect(page.getByLabel('Quantity', { exact: true })).toHaveValue('1');
+    await expect(order.locator('.order-selection')).toContainText(side === 'Buy Low' ? '175.52' : '185.55');
+    await expect(page.locator('.offer-table tr:has(button[aria-pressed="true"]) th')).toHaveText(
+      side === 'Buy Low' ? '175.52' : '185.55',
+    );
     await expect(page.locator('#quantity-help')).toContainText('1.003000 NVDAx');
     await expect(page.getByTestId('wrapping-rate')).toContainText('1 wNVDAx = 1.003 NVDAx');
+    // The settlement scenario that delivers stock shows the same fixed wrapped quantity as the order.
+    await expect(page.getByTestId(side === 'Buy Low' ? 'scenario-below' : 'scenario-above')).toContainText(
+      side === 'Buy Low' ? '1.000000 wNVDAx + premium' : 'Sale proceeds185.55 USDG',
+    );
     await quote(page);
     await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('1.000000 wNVDAx');
     await fill(page);
@@ -174,6 +182,6 @@ test('changing units discards a pending quote even when the typed number is unch
     .click();
   await page.clock.runFor(2000);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByLabel('Stock quantity')).toHaveValue('1');
+  await expect(page.getByLabel('Quantity', { exact: true })).toHaveValue('1');
   await expect(page.getByRole('button', { name: 'Prepare assets', exact: true })).toBeVisible();
 });

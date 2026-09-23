@@ -13,7 +13,16 @@ import {
   STORAGE_PREFIX,
   type Storage,
 } from '../src/lib/data/demo';
-import { parseQuantity, previewOrder, WAD } from '../src/lib/amounts';
+import { apr, aprBps, parseQuantity, previewOrder, rounded, WAD } from '../src/lib/amounts';
+
+test('aprBps backs both the two-decimal APR and the one-decimal strike labels', () => {
+  const year = 31536000;
+  assert.equal(aprBps('1000000', '10000000', year), 1000n);
+  assert.equal(apr('1000000', '10000000', year), '10.00');
+  assert.equal(rounded(aprBps('1845000', '10000000', year)!, 2, 1), '18.5');
+  assert.equal(aprBps('1000000', '10000000', 0), null);
+  assert.equal(apr('1000000', '10000000', 0), null);
+});
 import { expectedFillData } from '../src/lib/chain';
 import { runtimeSchema } from '../src/lib/config';
 import { GatewayAdapter, validateSelection } from '../src/lib/data/gateway';
@@ -70,6 +79,20 @@ test('quantity conversion uses integer arithmetic and existing strike SDK', () =
   assert.equal(preview(1).strikeAmountUSDG, '185000000');
   assert(BigInt(p.stockEquivalent) <= WAD);
   assert.equal(parseQuantity('1.000000000000000001'), WAD + 1n);
+});
+test('rounded display rounds half-up instead of truncating', () => {
+  assert.equal(rounded('999999999999999999', 18, 4), '1.0000');
+  assert.equal(rounded('998301000000000000', 18, 4), '0.9983');
+  assert.equal(rounded('998350000000000000', 18, 4), '0.9984');
+  assert.equal(rounded('1003000000000000000', 18, 6), '1.003000');
+  assert.equal(rounded('1234567', 6, 2), '1.23');
+});
+test('APR annualizes net premium over the time left to expiry and rejects empty bases', () => {
+  assert.equal(apr('500000', '220374264', 388800), '18.40');
+  assert.equal(apr('500000', '220374264', 388800.9), '18.40');
+  assert.equal(apr('500000', '0', 388800), null);
+  assert.equal(apr('500000', '220374264', 0), null);
+  assert.equal(apr('500000', '220374264', -60), null);
 });
 test('invalid, underflowing and overflowing amounts are rejected', () => {
   for (const input of ['0', '-1', '1e2', '1,000', ' 1', '1.0000000000000000001', '0x1', '9'.repeat(90)])

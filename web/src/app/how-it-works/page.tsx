@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Icon, Mark } from '@/components/icon';
+import { Icon } from '@/components/icon';
 import { getConfig } from '@/lib/config';
 
 export default function HowItWorks() {
@@ -9,16 +9,12 @@ export default function HowItWorks() {
     <div className="page guide-page">
       <section className="page-intro">
         <div>
-          <div className="eyebrow">
-            <span className="teal-line" /> THE PAYOFF GUIDE
-          </div>
           <h1>Know the terms before you start.</h1>
           <p>One premium. Fixed terms. Two possible outcomes.</p>
         </div>
-        <Mark size={58} />
       </section>
       <div className="guide-lead">
-        <span className="eyebrow">THE IDEA</span>
+        <span className="eyebrow">The idea</span>
         <h2>
           You choose your trading terms.
           <br />A dealer pays for the option.
@@ -32,8 +28,7 @@ export default function HowItWorks() {
       </div>
       <div className="guide-cards">
         <article>
-          <span className="guide-number">01 / BUY LOWER</span>
-          <Icon name="down" size={28} />
+          <Icon name="down" size={24} />
           <h2>Buy Low: put your USDG to work</h2>
           <p>Lock the agreed USDG amount and receive a net premium when the trade opens.</p>
           <div>
@@ -46,8 +41,7 @@ export default function HowItWorks() {
           </div>
         </article>
         <article>
-          <span className="guide-number">02 / SELL HIGHER</span>
-          <Icon name="up" size={28} />
+          <Icon name="up" size={24} />
           <h2>Sell High: set a price for your holdings</h2>
           <p>Lock the agreed quantity of wrapped stocks and receive a net premium when the trade opens.</p>
           <div>
@@ -62,7 +56,7 @@ export default function HowItWorks() {
       </div>
       <section className="guide-rules">
         <div>
-          <div className="eyebrow">BEFORE YOU START</div>
+          <div className="eyebrow">Before you start</div>
           <h2>Three details to understand.</h2>
         </div>
         <div>
@@ -114,7 +108,7 @@ export default function HowItWorks() {
           </p>
         </div>
         <Link href="/" className="button primary">
-          {demo ? 'Try the demo' : 'Explore products'} <Icon name="arrow" size={17} />
+          {demo ? 'Try the demo' : 'Explore Dual Investment'} <Icon name="arrow" size={17} />
         </Link>
       </div>
     </div>

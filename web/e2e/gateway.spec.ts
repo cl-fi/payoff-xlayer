@@ -72,7 +72,7 @@ test('test-token page validates amounts and asks the wallet to mint the selected
   expect(decodeFunctionData({ abi: faucetAbi, data: stockSent.data }).args).toEqual([1123456789123456789n]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   await page.getByRole('link', { name: 'Try Sell High' }).click();
-  await expect(page.getByRole('heading', { name: 'Create Sell High order' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sell High order' })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Sell High/ })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('link', { name: 'Get test NVIDIA', exact: true }).click();
   await expect(page).toHaveURL(/\/faucet#stock$/);
@@ -118,16 +118,18 @@ test('browser fetch reaches gateway directly; an unfunded offer never creates a 
     };
   }, TEST_ACCOUNT);
   await page.goto('/');
-  await expect(page.getByRole('group', { name: 'Choose an expiry' }).getByRole('button')).toHaveCount(2);
+  await expect(page.getByRole('table', { name: 'Target price and expiry' }).getByRole('button')).toHaveCount(
+    6,
+  );
   await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
-  await page.getByLabel('Stock quantity').fill('0.001');
+  await page.getByLabel('Quantity', { exact: true }).fill('0.001');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Create order' }).getByRole('alert')).toContainText(
     'The dealer cannot fund this quote',
   );
   expect(requested.some((url) => url.endsWith('/v1/rfqs'))).toBe(true);
-  await page.getByRole('link', { name: 'My positions', exact: true }).click();
+  await page.getByRole('link', { name: 'Portfolio', exact: true }).click();
   await expect(page.locator('.position-row')).toHaveCount(0);
 });
 
@@ -150,21 +152,23 @@ test('static products and public estimates need no RPC or wallet, and quantity/e
     }
   });
   await page.goto('/');
-  await expect(page.getByRole('group', { name: 'Choose a target price' }).getByRole('button')).toHaveCount(3);
+  const offers = page.getByRole('table', { name: 'Target price and expiry' });
+  await expect(offers.getByRole('button')).toHaveCount(6);
   await page
     .getByRole('group', { name: 'Quantity unit' })
     .getByRole('button', { name: 'wNVDAx', exact: true })
     .click();
   await expect(page.getByTestId('reference-premium')).toHaveText('0.500000 USDG');
-  await expect(page.getByTestId('reference-yield')).toHaveText('0.22%');
+  await expect(page.getByTestId('reference-apr')).toHaveText('18.40%');
+  await expect(offers.getByRole('button', { pressed: true })).toContainText('18.4% APR');
   await expect(page.getByText(/Last valid market bid/)).toContainText('Sep 18');
-  await page.getByLabel('Stock quantity').fill('2');
+  await page.getByLabel('Quantity', { exact: true }).fill('2');
   await expect(page.getByTestId('reference-premium')).toHaveText('1.000000 USDG');
-  await page.getByRole('group', { name: 'Choose an expiry' }).getByRole('button').nth(1).click();
+  await offers.locator('tbody tr').first().getByRole('button').nth(1).click();
   await expect(page.getByTestId('reference-premium')).toHaveText('1.000000 USDG');
   await page.getByRole('tab', { name: /Sell High/ }).click();
   await expect(page.getByTestId('reference-premium')).toHaveText('2.500000 USDG');
-  await expect(page.getByRole('group', { name: 'Choose a target price' }).getByRole('button')).toHaveCount(5);
+  await expect(offers.getByRole('button')).toHaveCount(10);
   expect(rpcCalls).toBe(0);
   expect(rfqCalls).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
@@ -189,13 +193,13 @@ test('wallet RPC and reference outages cannot erase the published directory', as
   }, TEST_ACCOUNT);
   await page.goto('/');
   await expect(page.getByTestId('reference-premium')).toHaveText('Temporarily unavailable');
-  const prices = page.getByRole('group', { name: 'Choose a target price' }).getByRole('button');
-  await expect(prices).toHaveCount(3);
+  const prices = page.getByRole('table', { name: 'Target price and expiry' }).getByRole('button');
+  await expect(prices).toHaveCount(6);
   await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
-  await expect(prices).toHaveCount(3);
+  await expect(prices).toHaveCount(6);
   await expect(page.getByText('Wallet balances could not be loaded. Refresh to try again.')).toBeVisible();
-  await expect(prices).toHaveCount(3);
+  await expect(prices).toHaveCount(6);
 });
 
 test('public estimates scale with raw wrapped units at a non-unit rate without a wallet', async ({
@@ -214,9 +218,10 @@ test('public estimates scale with raw wrapped units at a non-unit rate without a
     .getByRole('button', { name: 'wNVDAx', exact: true })
     .click();
   await expect(page.getByTestId('reference-premium')).toHaveText('0.500000 USDG');
-  await expect(page.locator('.target-block')).toContainText('220.37');
+  await expect(page.locator('.order-selection')).toContainText('220.37');
+  await expect(page.locator('.offer-table tr:has(button[aria-pressed="true"]) th')).toHaveText('220.37');
   await page.getByRole('tab', { name: /Sell High/ }).click();
   await expect(page.getByTestId('reference-premium')).toHaveText('1.250000 USDG');
-  await expect(page.locator('.target-block')).toContainText('225.38');
+  await expect(page.locator('.order-selection')).toContainText('225.38');
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });

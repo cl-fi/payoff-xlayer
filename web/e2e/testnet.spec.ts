@@ -69,13 +69,13 @@ test('deployed dates and all strikes, real balances and unavailable quotes', asy
   await setup(page);
   await page.goto('/');
   await expect(page.getByText('Quotes are not available yet.', { exact: true })).toBeVisible();
-  const dates = page.getByRole('group', { name: 'Choose an expiry' });
-  const prices = page.getByRole('group', { name: 'Choose a target price' });
-  await expect(dates.getByRole('button')).toHaveCount(2);
-  await expect(dates).toContainText('Sep 25');
-  await expect(dates).toContainText('Oct 2');
-  await expect(prices.getByRole('button')).toHaveText(['220.00USDG', '215.00USDG', '210.00USDG']);
-  await page.getByText('View settlement terms').click();
+  const offers = page.getByRole('table', { name: 'Target price and expiry' });
+  await expect(offers.getByRole('columnheader')).toHaveCount(3);
+  await expect(offers).toContainText('Sep 25');
+  await expect(offers).toContainText('Oct 2');
+  await expect(offers.getByRole('rowheader')).toHaveText(['220.00', '215.00', '210.00']);
+  await expect(offers.getByRole('button')).toHaveCount(6);
+  await page.locator('.technical-details summary').click();
   await expect(page.locator('.technical-details')).toContainText(
     `Series #${catalog.markets[0].series[0].id}`,
   );
@@ -83,20 +83,15 @@ test('deployed dates and all strikes, real balances and unavailable quotes', asy
     `1 wNVDAx = ${formatUnits(BigInt(TEST_RATE), 18)} NVDAx`,
   );
   await expect(page.locator('.technical-details')).toContainText('EDT');
-  await dates.getByRole('button', { name: /Oct 2/ }).click();
-  await prices.getByRole('button', { name: '210.00 USDG' }).click();
+  await offers.getByRole('button', { name: '210.00 USDG · Oct 2', exact: true }).click();
   await expect(page.locator('.technical-details')).toContainText(
     `Series #${catalog.markets[0].series[10].id}`,
   );
   await page.getByRole('tab', { name: 'Sell High' }).click();
-  await expect(prices.getByRole('button')).toHaveText([
-    '225.00USDG',
-    '230.00USDG',
-    '235.00USDG',
-    '240.00USDG',
-    '245.00USDG',
-  ]);
-  await prices.getByRole('button', { name: '245.00 USDG' }).click();
+  await expect(offers.getByRole('rowheader')).toHaveText(['225.00', '230.00', '235.00', '240.00', '245.00']);
+  // The remembered expiry (Oct 2) stays selected across strategies.
+  await expect(page.locator('.order-selection')).toHaveText('225.00 USDG · Oct 2');
+  await offers.getByRole('button', { name: '245.00 USDG · Oct 2', exact: true }).click();
   await expect(page.locator('.technical-details')).toContainText(
     `Series #${catalog.markets[0].series[15].id}`,
   );
@@ -105,7 +100,7 @@ test('deployed dates and all strikes, real balances and unavailable quotes', asy
   await expect(page.locator('.available-balance')).toContainText('50.0000 NVDAx');
   await page.screenshot({ path: testInfo.outputPath('testnet-product.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-  await page.getByRole('link', { name: 'My positions', exact: true }).click();
+  await page.getByRole('link', { name: 'Portfolio', exact: true }).click();
   const assets = page.getByLabel('Testnet wallet balances');
   await expect(assets).toContainText('10.00');
   await expect(assets).toContainText('0.200000');
@@ -130,12 +125,12 @@ test('RPC failure stays unavailable instead of showing demo data; reload recover
   await setup(page, options);
   await page.goto('/');
   await expect(page.locator('.global-alert[role=alert]')).toBeVisible();
-  await expect(page.locator('.strike-options button')).toHaveCount(0);
+  await expect(page.locator('.offer-table button')).toHaveCount(0);
   await expect(page.locator('.main-cta')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Demo settings' })).toHaveCount(0);
   options.offline = false;
   await page.getByRole('button', { name: 'Reload', exact: true }).click();
-  await expect(page.locator('.strike-options button')).toHaveCount(3);
+  await expect(page.locator('.offer-table button')).toHaveCount(6);
   await connect(page);
   await expect(page.locator('.available-balance')).toContainText('10.00 USDG');
   options.offline = true;
@@ -147,13 +142,15 @@ test('RPC failure stays unavailable instead of showing demo data; reload recover
 test('closed expiries are excluded at the exact cutoff and do not roll forward', async ({ page }) => {
   await setup(page, { date: new Date(1790364600 * 1000) });
   await page.goto('/');
-  await expect(page.locator('.tenor-options button')).toHaveCount(1);
-  await expect(page.locator('.tenor-options')).toContainText('Oct 2');
+  const offers = page.getByRole('table', { name: 'Target price and expiry' });
+  await expect(offers.getByRole('columnheader')).toHaveCount(2);
+  await expect(offers).toContainText('Oct 2');
+  await expect(offers.getByRole('button')).toHaveCount(3);
   await page.clock.setFixedTime(new Date(1790969400 * 1000));
   await page.reload();
   await expect(page.getByText('No series are open for new positions.')).toBeVisible();
   await expect(page.locator('.main-cta')).toBeDisabled();
-  await expect(page.locator('.strike-options button')).toHaveCount(0);
+  await expect(page.locator('.offer-table button')).toHaveCount(0);
 });
 
 test('wrong wallet network is explicit; account changes refresh the queried wallet', async ({ page }) => {
@@ -163,7 +160,7 @@ test('wrong wallet network is explicit; account changes refresh the queried wall
   await expect(
     page.getByText('Your wallet is on another network. Data shown here is from X Layer Testnet.'),
   ).toBeVisible();
-  await page.getByRole('link', { name: 'My positions', exact: true }).click();
+  await page.getByRole('link', { name: 'Portfolio', exact: true }).click();
   await expect(page.getByRole('link', { name: 'View wallet on explorer' })).toHaveAttribute(
     'href',
     `${deployment.explorerUrl}/address/${TEST_ACCOUNT}`,

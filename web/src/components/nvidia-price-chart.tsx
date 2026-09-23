@@ -45,25 +45,24 @@ export const NvidiaPriceChart = memo(function NvidiaPriceChart() {
       height: '100%',
       locale: 'en',
       colorTheme: 'light',
-      backgroundColor: '#ffffff',
-      isTransparent: false,
+      isTransparent: true,
       chartOnly: false,
       chartType: 'area',
-      lineColor: '#0e7c72',
-      topColor: 'rgba(14, 124, 114, 0.14)',
-      bottomColor: 'rgba(14, 124, 114, 0)',
+      lineColor: '#3a4552',
+      topColor: 'rgba(20, 32, 42, 0.08)',
+      bottomColor: 'rgba(20, 32, 42, 0)',
       lineWidth: 2,
       lineType: 0,
-      fontColor: '#727c83',
+      fontColor: '#667080',
       widgetFontColor: '#14202a',
-      gridLineColor: 'rgba(229, 232, 228, 0.45)',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '10',
+      gridLineColor: 'rgba(226, 229, 232, 0.6)',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif',
+      fontSize: '11',
       headerFontSize: 'medium',
       showVolume: false,
       showMA: false,
       hideDateRanges: false,
-      hideMarketStatus: false,
+      hideMarketStatus: true,
       hideSymbolLogo: true,
       scalePosition: 'right',
       scaleMode: 'Normal',
@@ -91,10 +90,6 @@ export const NvidiaPriceChart = memo(function NvidiaPriceChart() {
 
   return (
     <figure className="nvda-chart" aria-label="NVIDIA stock price chart">
-      <div className="nvda-chart-label">
-        <span>Underlying stock</span>
-        <span>NVDA · USD</span>
-      </div>
       <div className="nvda-chart-frame">
         <div className="nvda-chart-host" ref={host} />
         {status !== 'ready' && (
@@ -116,13 +111,13 @@ export const NvidiaPriceChart = memo(function NvidiaPriceChart() {
         )}
       </div>
       <figcaption className="nvda-chart-caption">
-        <div className="tradingview-widget-copyright">
+        <span className="tradingview-widget-copyright">
           <a href={NVIDIA_URL} target="_blank" rel="noopener nofollow">
             NVIDIA stock price
           </a>{' '}
-          <span>by TradingView</span>
-        </div>
-        <span>Stock market reference · Data may be delayed</span>
+          by TradingView
+        </span>
+        <span>May be delayed</span>
       </figcaption>
     </figure>
   );

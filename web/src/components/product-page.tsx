@@ -5,15 +5,27 @@ import { useProduct } from './provider';
 import { Icon } from './icon';
 import { Modal } from './modal';
 import { DEMO_ACCOUNT, DemoAdapter, isPrepared } from '@/lib/data/demo';
-import { amount, dateOnly, dateTime, precise, previewOrder, ratio, stockTarget } from '@/lib/amounts';
+import {
+  amount,
+  apr,
+  aprBps,
+  dateOnly,
+  dateTime,
+  precise,
+  previewOrder,
+  rounded,
+  stockTarget,
+} from '@/lib/amounts';
 import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
 import { quoteTerms, type AppQuote, type Position, type QuantityUnit } from '@/lib/types';
 import { friendlyError, switchNetwork } from '@/lib/wallet';
 import { GatewayAdapter } from '@/lib/data/gateway';
 import { TradingWallet } from '@/lib/transactions';
 import { UserFacingError } from '@/lib/errors';
-import { referenceEstimate } from '@/lib/data/reference';
+import { referenceEstimate, referenceQuote } from '@/lib/data/reference';
 import { NvidiaPriceChart } from './nvidia-price-chart';
+import { ScenarioPreview } from './scenario-preview';
+import { TokenIcon } from './token-icon';
 
 export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const {
@@ -46,26 +58,38 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     [completed, setCompleted] = useState<Position | null>(null);
   const [now, setNow] = useState(0),
     operation = useRef(0);
+  const orderCard = useRef<HTMLElement>(null),
+    [dock, setDock] = useState(false);
   useEffect(() => {
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  // On narrow screens the order card sits below the strategy panel; a compact dock offers a jump to it
+  // while the card is still out of view below the fold.
+  useEffect(() => {
+    const card = orderCard.current;
+    if (!card || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setDock(!entry.isIntersecting && entry.boundingClientRect.top > 0),
+    );
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
   const available = market?.series.filter((s) => s.side === side && Number(s.tradeCutoff) * 1000 > now) ?? [];
   const expiries = [...new Set(available.map((s) => s.exerciseEnd))].sort((a, b) => Number(a) - Number(b));
   const expiry = selectedExpiry && expiries.includes(selectedExpiry) ? selectedExpiry : expiries[0];
-  const pricedSeries = available
-    .filter((s) => s.exerciseEnd === expiry)
-    .sort((a, b) => {
-      const comparison =
-        BigInt(a.strikePricePerWrappedUSDG) < BigInt(b.strikePricePerWrappedUSDG)
-          ? -1
-          : BigInt(a.strikePricePerWrappedUSDG) > BigInt(b.strikePricePerWrappedUSDG)
-            ? 1
-            : 0;
-      return side === 0 ? -comparison : comparison;
-    });
-  const series = pricedSeries.find((s) => s.id === selectedSeries) ?? pricedSeries[0];
+  // Distinct strikes across the open expiries, nearest the market first: descending for Buy Low,
+  // ascending for Sell High. Each strike × expiry cell of the offer table is one series.
+  const strikes = [...new Set(available.map((s) => s.strikePricePerWrappedUSDG))].sort((a, b) => {
+    const comparison = BigInt(a) < BigInt(b) ? -1 : BigInt(a) > BigInt(b) ? 1 : 0;
+    return side === 0 ? -comparison : comparison;
+  });
+  const offer = (strike: string, end: string) =>
+    available.find((s) => s.strikePricePerWrappedUSDG === strike && s.exerciseEnd === end);
+  const series =
+    available.find((s) => s.id === selectedSeries) ??
+    (expiry ? strikes.map((strike) => offer(strike, expiry)).find(Boolean) : undefined);
   const calculation = useMemo(() => {
     if (!market || !series) return { preview: null, error: '' };
     try {
@@ -83,6 +107,10 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const terms = quote ? quoteTerms(quote) : null,
     remaining = terms ? Math.max(0, Math.ceil(Number(terms.deadline) - now / 1000)) : 0;
   const cutoff = !!series && now >= Number(series.tradeCutoff) * 1000;
+  const secondsToExpiry = series ? Number(series.exerciseEnd) - now / 1000 : 0;
+  const estimatedApr =
+    estimate && preview ? apr(estimate.netPremiumUSDG, preview.strikeAmountUSDG, secondsToExpiry) : null;
+  const quotedApr = terms ? apr(terms.netPremiumUSDG, terms.strikeAmountUSDG, secondsToExpiry) : null;
   const readOnly = config.mode === 'testnet';
   const pending = activity.some((tx) => tx.status === 'pending');
   const wrongNetwork = connection?.kind === 'wallet' && connection.chainId !== config.chainId;
@@ -207,126 +235,180 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   };
   const isPut = side === 0;
   const wrappedInput = quantityUnit === 'wrapped';
+  const displayTarget =
+    series && market
+      ? wrappedInput
+        ? BigInt(series.strikePricePerWrappedUSDG)
+        : stockTarget(series, market.rate)
+      : null;
+  const displayQuantity = preview ? (wrappedInput ? preview.wrappedQuantity : preview.stockEquivalent) : null;
+  const settlementTotal =
+    preview && estimate ? BigInt(preview.strikeAmountUSDG) + BigInt(estimate.netPremiumUSDG) : null;
+  const expiryLabel = (s: { exerciseEnd: string; days: number }) =>
+    config.mode === 'demo' ? `${s.days} days` : dateOnly(s.exerciseEnd, timeZone);
   return (
     <div className="page product-page">
       <section className="page-intro">
         <div>
-          <div className="eyebrow">
-            <span className="teal-line" /> YOUR PRICE. YOUR PAYOFF.
-          </div>
-          <h1>Make your waiting count.</h1>
-          <p>Set a price you are willing to buy or sell at, and earn a premium upfront.</p>
+          <h1>Dual Investment</h1>
+          <p>Enjoy high rewards — Buy Low, Sell High</p>
         </div>
-        <Link className="text-link intro-link" href="/how-it-works">
-          See how it works <Icon name="arrow" size={17} />
-        </Link>
+        <div className="strategy-tabs" role="tablist" aria-label="Strategy">
+          <button
+            role="tab"
+            aria-selected={isPut}
+            onClick={() => setSide(0)}
+            className={isPut ? 'selected' : ''}
+          >
+            <Icon name="down" />
+            <span>
+              Buy Low<small>Set a target buying price</small>
+            </span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={!isPut}
+            onClick={() => setSide(1)}
+            className={!isPut ? 'selected' : ''}
+          >
+            <Icon name="up" />
+            <span>
+              Sell High<small>Set a target selling price</small>
+            </span>
+          </button>
+        </div>
       </section>
       <div className="product-grid">
-        <section className="strategy-panel">
+        <section className="strategy-panel" aria-label="Market and offers">
           <div className="asset-header">
             <div className="asset-identity">
-              <div className="stock-avatar">N</div>
-              <div>
-                <h2>
-                  NVDAx{' '}
-                  <span className="subtle-badge">{config.mode === 'demo' ? 'xStocks' : 'Test asset'}</span>
-                </h2>
-                <p>
-                  {config.mode === 'demo' ? 'NVIDIA · Tokenized stock' : 'NVIDIA strategy · tNVDAx / twNVDAx'}
-                </p>
-              </div>
+              <TokenIcon symbol="NVDAx" size={40} />
+              <h2>
+                NVDAx <span>· NVIDIA</span>
+              </h2>
             </div>
-            <span className="asset-tag">
-              <span className="teal-dot" />
-              {config.mode === 'demo' ? 'Demo product' : 'Testnet product'}
-            </span>
-          </div>
-          <div className="strategy-tabs" role="tablist" aria-label="Strategy">
-            <button
-              role="tab"
-              aria-selected={isPut}
-              onClick={() => setSide(0)}
-              className={isPut ? 'selected' : ''}
-            >
-              <Icon name="down" />
-              <span>
-                Buy Low<small>Set a target buying price</small>
-              </span>
-            </button>
-            <button
-              role="tab"
-              aria-selected={!isPut}
-              onClick={() => setSide(1)}
-              className={!isPut ? 'selected' : ''}
-            >
-              <Icon name="up" />
-              <span>
-                Sell High<small>Set a target selling price</small>
-              </span>
-            </button>
           </div>
           <NvidiaPriceChart />
-          <div className="strategy-content">
-            <div className="eyebrow">{isPut ? 'BUY LOWER' : 'SELL HIGHER'}</div>
-            <h2>{isPut ? 'Get paid to wait for your price.' : 'Give your holdings a selling target.'}</h2>
-            <p className="strategy-description">
-              {isPut
-                ? 'Deposit USDG and collect a premium upfront. If the dealer exercises, buy wrapped stocks on the agreed terms. Otherwise, reclaim your USDG at expiry.'
-                : 'Deposit wrapped stocks and collect a premium upfront. If the dealer exercises, sell on the agreed terms. Otherwise, reclaim your wrapped stocks at expiry.'}
-            </p>
-            <div className="outcome-visual">
-              <div className="visual-label">
-                <span>One order. Two possible outcomes.</span>
-                <span>Keep the premium in either case</span>
-              </div>
-              <div className="flow-source">
-                <span className="flow-icon">
-                  <Icon name={isPut ? 'wallet' : 'layers'} />
-                </span>
-                <div>
-                  <small>You lock</small>
-                  <strong>{isPut ? 'USDG' : 'wNVDAx'}</strong>
-                </div>
-                <span className="premium-pill">＋ Earn a premium</span>
-              </div>
-              <div className="flow-branches">
-                <div>
-                  <span className="branch-caption">Dealer exercises</span>
-                  <strong>{isPut ? 'Receive wrapped stocks' : 'Receive USDG'}</strong>
-                  <small>{isPut ? 'Buy for the agreed amount' : 'Sell for the agreed amount'}</small>
-                </div>
-                <div>
-                  <span className="branch-caption">Expires without exercise</span>
-                  <strong>{isPut ? 'Reclaim USDG' : 'Reclaim wrapped stocks'}</strong>
-                  <small>You keep the premium</small>
-                </div>
-              </div>
-            </div>
-            <p className="fine-print rule-note">
-              <Icon name="info" size={15} />
-              The dealer chooses whether to exercise. Reaching the target price does not trigger automatic
-              settlement.
-            </p>
-          </div>
-          <div className="strategy-bottom">
-            <span>
-              <Icon name="shield" size={16} />
-              Fully collateralized
-            </span>
-            <span>
-              <Icon name="layers" size={16} />
-              Fixed wrapped units
-            </span>
-            <span>
-              <Icon name="clock" size={16} />
-              Defined expiry
-            </span>
+          <div className="offer-panel">
+            {available.length ? (
+              <table className="offer-table" aria-label="Target price and expiry">
+                <thead>
+                  <tr>
+                    <th scope="col">
+                      Target price<small>USDG per {wrappedInput ? 'wNVDAx' : 'NVDAx'}</small>
+                    </th>
+                    {expiries.map((end) => {
+                      const s = available.find((s) => s.exerciseEnd === end)!;
+                      const remainingDays = Math.ceil((Number(end) - now / 1000) / 86400);
+                      return (
+                        <th scope="col" key={end}>
+                          {expiryLabel(s)}
+                          <small>
+                            {config.mode === 'demo'
+                              ? dateTime(end)
+                              : now
+                                ? remainingDays < 2
+                                  ? 'Less than 1 day left'
+                                  : `${remainingDays} days left`
+                                : '\u00a0'}
+                          </small>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {strikes.map((strike) => {
+                    const row = expiries.map((end) => offer(strike, end));
+                    const sample = row.find((s) => !!s)!;
+                    const target = market
+                      ? amount(wrappedInput ? strike : stockTarget(sample, market.rate))
+                      : '—';
+                    return (
+                      <tr key={strike}>
+                        <th scope="row">{target}</th>
+                        {row.map((s, index) => {
+                          const end = expiries[index];
+                          if (!s)
+                            return (
+                              <td key={end}>
+                                <span className="offer-empty">—</span>
+                              </td>
+                            );
+                          const reference =
+                            config.mode === 'gateway' && market
+                              ? referenceQuote(references, s, market.rate, now)
+                              : null;
+                          const strikeApr = reference
+                            ? aprBps(
+                                reference.netPremiumPerWrappedUSDG,
+                                s.strikePricePerWrappedUSDG,
+                                Number(s.exerciseEnd) - now / 1000,
+                              )
+                            : null;
+                          const aprLabel = strikeApr === null ? null : `${rounded(strikeApr, 2, 1)}% APR`;
+                          const selected = s.id === series?.id;
+                          return (
+                            <td key={end}>
+                              <button
+                                type="button"
+                                className={`${selected ? 'selected' : ''}${aprLabel ? ' apr' : ''}`}
+                                aria-pressed={selected}
+                                aria-label={`${target} USDG · ${expiryLabel(s)}${aprLabel ? ` · ${aprLabel}` : ''}`}
+                                onClick={() => {
+                                  setSelectedSeries(s.id);
+                                  setSelectedExpiry(end);
+                                }}
+                              >
+                                {aprLabel ??
+                                  (selected ? (
+                                    <>
+                                      <Icon name="check" size={14} />
+                                      Selected
+                                    </>
+                                  ) : (
+                                    'Select'
+                                  ))}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : loading ? (
+              <div className="skeleton" />
+            ) : (
+              <p className="muted">
+                {error
+                  ? 'Series could not be loaded. Please reload.'
+                  : 'No series are open for new positions.'}
+              </p>
+            )}
           </div>
         </section>
-        <section className="order-card" aria-label="Create order">
+        <section className="order-card" aria-label="Create order" ref={orderCard}>
           <div className="order-heading">
-            <h2>Create {isPut ? 'Buy Low' : 'Sell High'} order</h2>
-            <span className="subtle-badge">NVDAx</span>
+            <div>
+              <h2>{isPut ? 'Buy Low' : 'Sell High'} order</h2>
+              <span className="order-selection">
+                {series && displayTarget !== null
+                  ? `${amount(displayTarget)} USDG · ${expiryLabel(series)}`
+                  : 'No open series'}
+              </span>
+            </div>
+            {config.mode !== 'demo' && (
+              <button
+                className="icon-button"
+                aria-label="Refresh onchain data"
+                disabled={loading}
+                onClick={() => void reload()}
+              >
+                <Icon name="refresh" size={16} />
+              </button>
+            )}
           </div>
           {readOnly && (
             <div className="notice availability-notice" role="status">
@@ -334,92 +416,43 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               <p>{QUOTES_UNAVAILABLE}</p>
             </div>
           )}
-          <div className="field-label" id="expiry-label">
-            Choose an expiry <span>{config.mode === 'demo' ? 'Fixed expiry' : 'New York time'}</span>
-          </div>
-          <div className="tenor-options" role="group" aria-labelledby="expiry-label">
-            {expiries.map((end) => {
-              const s = available.find((s) => s.exerciseEnd === end)!;
-              const remainingDays = Math.ceil((Number(end) - now / 1000) / 86400);
-              return (
-                <button
-                  key={end}
-                  onClick={() => setSelectedExpiry(end)}
-                  aria-pressed={end === expiry}
-                  className={end === expiry ? 'selected' : ''}
-                >
-                  <strong>{config.mode === 'demo' ? `${s.days} days` : dateOnly(end, timeZone)}</strong>
-                  <small>
-                    {config.mode === 'demo'
-                      ? `${dateTime(end)} expiry`
-                      : now
-                        ? `${remainingDays < 2 ? 'Less than 1 day' : `${remainingDays} days`} remaining`
-                        : 'Fixed expiry'}
-                  </small>
-                </button>
-              );
-            })}
-            {!available.length &&
-              (loading ? (
-                <div className="skeleton" />
-              ) : (
-                <p className="muted">
-                  {error
-                    ? 'Series could not be loaded. Please reload.'
-                    : 'No series are open for new positions.'}
-                </p>
-              ))}
-          </div>
-          {pricedSeries.length > 0 && (
-            <>
-              <div className="field-label" id="strike-label">
-                Choose a target price <span>USDG per {wrappedInput ? 'wNVDAx' : 'NVDAx equivalent'}</span>
-              </div>
-              <div className="strike-options" role="group" aria-labelledby="strike-label">
-                {pricedSeries.map((s) => (
-                  <button
-                    key={s.id}
-                    aria-pressed={s.id === series?.id}
-                    className={s.id === series?.id ? 'selected' : ''}
-                    onClick={() => setSelectedSeries(s.id)}
-                  >
-                    {market &&
-                      amount(wrappedInput ? s.strikePricePerWrappedUSDG : stockTarget(s, market.rate))}
-                    <small>USDG</small>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          <div className="target-block">
-            <div>
-              <span className="field-label">
-                {wrappedInput ? 'Fixed' : 'Reference'} {isPut ? 'buy' : 'sell'} price{' '}
-                <span>per {wrappedInput ? 'wNVDAx' : 'NVDAx'}</span>
+          <ScenarioPreview
+            isPut={isPut}
+            unit={wrappedInput ? 'wNVDAx' : 'NVDAx'}
+            approximate={!wrappedInput}
+            target={displayTarget === null ? null : amount(displayTarget)}
+            quantity={
+              displayQuantity === null
+                ? null
+                : wrappedInput
+                  ? amount(displayQuantity, 18, 6)
+                  : rounded(displayQuantity, 18, 4)
+            }
+            usdg={preview ? amount(preview.strikeAmountUSDG) : null}
+            premium={estimate ? amount(estimate.netPremiumUSDG) : null}
+            total={settlementTotal === null ? null : amount(settlementTotal)}
+            expiry={series ? dateOnly(series.exerciseEnd, timeZone) : null}
+          />
+          <div className="field-label quantity-label">
+            <label htmlFor="quantity">Quantity</label>
+            {(balances || config.mode === 'gateway') && (
+              <span className="field-aside">
+                {balances && (
+                  <span className="available-balance">
+                    <Icon name="wallet" size={13} />
+                    {isPut
+                      ? `${amount(balances.usdg)} USDG`
+                      : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
+                  </span>
+                )}
+                {config.mode === 'gateway' && (
+                  <Link className="text-link" href={`/faucet#${isPut ? 'usdg' : 'stock'}`}>
+                    {isPut ? 'Get test USDG' : 'Get test NVIDIA'}
+                  </Link>
+                )}
               </span>
-              <strong>
-                {series && market
-                  ? amount(wrappedInput ? series.strikePricePerWrappedUSDG : stockTarget(series, market.rate))
-                  : '—'}{' '}
-                <small>USDG</small>
-              </strong>
-            </div>
-            <span className="target-icon">
-              <Icon name={isPut ? 'down' : 'up'} size={24} />
-            </span>
+            )}
           </div>
-          <div className="quantity-units" role="group" aria-label="Quantity unit">
-            <button type="button" aria-pressed={!wrappedInput} onClick={() => setQuantityUnit('stock')}>
-              NVDAx
-            </button>
-            <button type="button" aria-pressed={wrappedInput} onClick={() => setQuantityUnit('wrapped')}>
-              wNVDAx
-            </button>
-          </div>
-          <label className="field-label" htmlFor="quantity">
-            Stock quantity{' '}
-            <span>{wrappedInput ? 'Fixed wrapped units' : 'At the current exchange rate'}</span>
-          </label>
           <div className={`quantity-input ${calculation.error ? 'invalid' : ''}`}>
             <input
               id="quantity"
@@ -430,7 +463,16 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               aria-describedby={calculation.error ? 'quantity-error' : 'quantity-help'}
               onChange={(e) => setQuantity(e.target.value)}
             />
-            <span>{wrappedInput ? 'wNVDAx' : 'NVDAx'}</span>
+            <div className="unit-toggle" role="group" aria-label="Quantity unit">
+              <button type="button" aria-pressed={!wrappedInput} onClick={() => setQuantityUnit('stock')}>
+                <TokenIcon symbol="NVDAx" size={16} />
+                NVDAx
+              </button>
+              <button type="button" aria-pressed={wrappedInput} onClick={() => setQuantityUnit('wrapped')}>
+                <TokenIcon symbol="wNVDAx" size={16} />
+                wNVDAx
+              </button>
+            </div>
           </div>
           {calculation.error ? (
             <p id="quantity-error" className="field-error">
@@ -439,22 +481,18 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           ) : (
             <p id="quantity-help" className="input-help">
               {wrappedInput
-                ? `≈ ${preview ? amount(preview.stockEquivalent, 18, 6) : '—'} NVDAx at the current rate. Settlement uses your fixed wNVDAx quantity.`
-                : `≈ ${preview ? amount(preview.wrappedQuantity, 18, 6) : '—'} wNVDAx. Settlement uses this fixed quantity.`}
+                ? `≈ ${preview ? amount(preview.stockEquivalent, 18, 6) : '—'} NVDAx at today's rate`
+                : `≈ ${preview ? amount(preview.wrappedQuantity, 18, 6) : '—'} wNVDAx · fixed at settlement`}
             </p>
           )}
-          <p className="input-help" data-testid="wrapping-rate">
-            1 wNVDAx = {market ? precise(market.rate) : '—'} NVDAx.
-            {series &&
-              market &&
-              (wrappedInput
-                ? ` Current equivalent target: ${amount(stockTarget(series, market.rate), 6, 4)} USDG per NVDAx.`
-                : ` Fixed target: ${precise(series.strikePricePerWrappedUSDG, 6)} USDG per wNVDAx.`)}{' '}
-            The NVDAx equivalent can change; wrapped settlement terms stay fixed.
-          </p>
+          {balancesError && (
+            <div className="notice" role="status">
+              {balancesError}
+            </div>
+          )}
           <div className="order-summary">
             <div>
-              <span>{isPut ? 'USDG to lock' : 'Wrapped stocks to lock'}</span>
+              <span>You lock</span>
               <strong>
                 {preview
                   ? isPut
@@ -464,75 +502,33 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               </strong>
             </div>
             <div>
-              <span>{config.mode === 'gateway' ? 'Estimated net premium' : 'Net premium'}</span>
-              <strong data-testid="reference-premium">
-                {config.mode !== 'gateway'
-                  ? 'Available after quoting'
-                  : estimate
-                    ? `${amount(estimate.netPremiumUSDG, 6, 6)} USDG`
-                    : !references && !referenceError
-                      ? 'Loading reference…'
-                      : 'Temporarily unavailable'}
+              <span>{config.mode === 'gateway' ? 'Est. premium' : 'Premium'}</span>
+              <strong>
+                <span data-testid="reference-premium" className={estimate ? 'teal-text' : undefined}>
+                  {config.mode !== 'gateway'
+                    ? 'Available after quoting'
+                    : estimate
+                      ? `${amount(estimate.netPremiumUSDG, 6, 6)} USDG`
+                      : !references && !referenceError
+                        ? 'Loading reference…'
+                        : 'Temporarily unavailable'}
+                </span>
+                {estimatedApr && (
+                  <span className="summary-apr">
+                    <span data-testid="reference-apr">{estimatedApr}%</span> APR
+                  </span>
+                )}
               </strong>
-            </div>
-            {config.mode === 'gateway' && (
-              <div>
-                <span>Estimated term yield</span>
-                <strong data-testid="reference-yield">
-                  {estimate && preview ? `${ratio(estimate.netPremiumUSDG, preview.strikeAmountUSDG)}%` : '—'}
-                </strong>
-              </div>
-            )}
-            <div>
-              <span>Exercise window</span>
-              <span>
-                {series
-                  ? `${dateTime(series.exerciseStart, timeZone)} · ${(Number(series.exerciseEnd) - Number(series.exerciseStart)) / 60} min`
-                  : '—'}
-              </span>
             </div>
           </div>
           {config.mode === 'gateway' && (
-            <div className="reference-note" role="status">
-              <p>Reference estimate · Final premium is confirmed in your trade quote.</p>
-              {estimate && (
-                <>
-                  <p>
-                    {estimate.live ? 'Live market bid' : 'Last valid market bid'} ·{' '}
-                    {dateTime(estimate.quote.marketTimestampMs / 1000, 'America/New_York')}
-                  </p>
-                  <p>
-                    Term yield = net premium ÷ {isPut ? 'USDG collateral' : 'agreed sale amount'}. Not
-                    annualized.
-                  </p>
-                  {(estimate.delayed || referenceError) && (
-                    <p>Updates delayed. Showing the last available reference.</p>
-                  )}
-                </>
-              )}
-              {!estimate && referenceError && <p>{referenceError}</p>}
-            </div>
-          )}
-          {balancesError && (
-            <div className="notice" role="status">
-              {balancesError}
-            </div>
-          )}
-          {balances && (
-            <div className="available-balance">
-              <Icon name="wallet" size={14} />
-              Available:{' '}
-              {isPut
-                ? `${amount(balances.usdg)} USDG`
-                : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
-            </div>
-          )}
-          {config.mode === 'gateway' && (
-            <p className="input-help">
-              Need test assets?{' '}
-              <Link className="text-link" href={`/faucet#${isPut ? 'usdg' : 'stock'}`}>
-                {isPut ? 'Get test USDG' : 'Get test NVIDIA'}
-              </Link>
+            <p className="reference-note" role="status">
+              {estimate
+                ? `${estimate.live ? 'Live market bid' : 'Last valid market bid'} · ${dateTime(
+                    estimate.quote.marketTimestampMs / 1000,
+                    'America/New_York',
+                  )}${estimate.delayed || referenceError ? ' · Updates delayed' : ''} · Final premium confirmed in your quote`
+                : referenceError || 'Final premium is confirmed in your quote'}
             </p>
           )}
           {message && !dialog && (
@@ -567,90 +563,100 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             )}
             {!busy && !cutoff && !(readOnly && connection) && <Icon name="arrow" size={18} />}
           </button>
-          <p className="cta-note">
-            {config.mode === 'demo'
-              ? 'Demo quotes only · No real assets needed'
-              : readOnly
-                ? 'Live testnet data · Trading is not enabled'
-                : 'Quotes requested directly from the gateway'}
-          </p>
           {preview && (
             <details className="technical-details">
               <summary>
-                View settlement terms <Icon name="chevron" size={14} />
+                Details <Icon name="chevron" size={14} />
               </summary>
               <dl>
-                <dt>Fixed delivery quantity</dt>
+                <dt>Delivery quantity</dt>
                 <dd>{precise(preview.wrappedQuantity)} wNVDAx</dd>
-                <dt>Fixed settlement amount</dt>
+                <dt>Settlement amount</dt>
                 <dd>{precise(preview.strikeAmountUSDG, 6)} USDG</dd>
-                <dt>Current wrapping rate</dt>
-                <dd>1 wNVDAx = {market && precise(market.rate)} NVDAx</dd>
-                <dt>Trading cutoff</dt>
-                <dd>{dateTime(preview.series.tradeCutoff, timeZone)}</dd>
-                <dt>Exercise ends</dt>
-                <dd>{dateTime(preview.series.exerciseEnd, timeZone)}</dd>
                 {config.mode !== 'demo' && (
                   <>
-                    <dt>Onchain series</dt>
-                    <dd>Series #{preview.series.id}</dd>
-                    <dt>Fixed price per wrapped token</dt>
+                    <dt>Price per wNVDAx</dt>
                     <dd>{precise(preview.series.strikePricePerWrappedUSDG, 6)} USDG</dd>
+                  </>
+                )}
+                <dt>Wrapping rate</dt>
+                <dd data-testid="wrapping-rate">1 wNVDAx = {market && precise(market.rate)} NVDAx</dd>
+                <dt>Trading cutoff</dt>
+                <dd>{dateTime(preview.series.tradeCutoff, timeZone)}</dd>
+                <dt>Exercise window</dt>
+                <dd>
+                  {dateTime(preview.series.exerciseStart, timeZone)} ·{' '}
+                  {(Number(preview.series.exerciseEnd) - Number(preview.series.exerciseStart)) / 60} min
+                </dd>
+                {config.mode !== 'demo' && (
+                  <>
+                    <dt>Onchain</dt>
+                    <dd>
+                      Series #{preview.series.id} ·{' '}
+                      <a
+                        href={`${config.explorerUrl}/address/${config.nvdaVault}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Vault <Icon name="external" size={11} />
+                      </a>
+                      {market && (
+                        <>
+                          {' · '}
+                          <a
+                            href={`${config.explorerUrl}/address/${market.exchange}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Exchange <Icon name="external" size={11} />
+                          </a>
+                        </>
+                      )}
+                    </dd>
                   </>
                 )}
               </dl>
               <p>
-                The reference target uses the current exchange rate. After opening, wrapped units and the
-                settlement amount are fixed. Underlying rights affected by dividends and splits transfer with
-                the wrapped tokens.
+                The dealer chooses whether to exercise; reaching the target does not settle automatically.
+                Once the order opens, the wrapped quantity and settlement amount are fixed, while the NVDAx
+                equivalent follows the wrapping rate. Underlying rights affected by dividends and splits
+                transfer with the wrapped tokens.
+                {config.mode === 'gateway' &&
+                  ` APR is the net premium divided by the ${isPut ? 'USDG you lock' : 'sale proceeds'}, annualized over the time to expiry (simple, not compounded).`}
+                {config.mode !== 'demo' && ' tNVDAx and twNVDAx are test tokens with no real value.'}
               </p>
             </details>
           )}
-          {config.mode !== 'demo' && market && (
-            <div className="deployment-links">
-              <a href={`${config.explorerUrl}/address/${config.nvdaVault}`} target="_blank" rel="noreferrer">
-                View Vault <Icon name="external" size={12} />
-              </a>
-              <a href={`${config.explorerUrl}/address/${market.exchange}`} target="_blank" rel="noreferrer">
-                View Exchange <Icon name="external" size={12} />
-              </a>
-              <button disabled={loading} onClick={() => void reload()}>
-                {loading ? 'Refreshing…' : 'Refresh onchain data'}
-              </button>
-            </div>
-          )}
         </section>
       </div>
-      <section className="process-strip">
+      <div className={`order-dock${dock ? ' visible' : ''}`}>
         <div>
-          <span>01</span>
-          <div>
-            <h3>Choose your target</h3>
-            <p>Pick a strategy, quantity and expiry</p>
-          </div>
+          <strong>
+            {isPut ? 'Buy Low' : 'Sell High'} · {displayTarget === null ? '—' : amount(displayTarget)} USDG
+          </strong>
+          <span>
+            {estimate && estimatedApr
+              ? `${amount(estimate.netPremiumUSDG)} USDG premium · ${estimatedApr}% APR`
+              : series
+                ? `Expires ${dateOnly(series.exerciseEnd, timeZone)}`
+                : 'No open series'}
+          </span>
         </div>
-        <div>
-          <span>02</span>
-          <div>
-            <h3>Review your quote</h3>
-            <p>Review your net premium and both outcomes</p>
-          </div>
-        </div>
-        <div>
-          <span>03</span>
-          <div>
-            <h3>Track your position</h3>
-            <p>Claim your assets after exercise or expiry</p>
-          </div>
-        </div>
-      </section>
+        <button
+          type="button"
+          className="button primary"
+          onClick={() => orderCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        >
+          Review order
+        </button>
+      </div>
       <Modal
         open={dialog === 'assets'}
         onClose={() => {
           if (!busy) setDialog(null);
         }}
         title="Prepare your assets"
-        eyebrow="STEP 01 / ASSETS"
+        eyebrow="Step 1 of 2 · Assets"
       >
         <p className="muted modal-intro">
           {isPut
@@ -708,7 +714,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           if (!busy) setDialog(null);
         }}
         title="Confirm your quote"
-        eyebrow="STEP 02 / YOUR QUOTE"
+        eyebrow="Step 2 of 2 · Quote"
       >
         {terms && preview && (
           <>
@@ -722,18 +728,15 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               </strong>
             </div>
             <div className="premium-display">
-              <span>Paid upfront · Net premium</span>
+              <span>Premium · paid upfront</span>
               <strong>
                 {amount(terms.netPremiumUSDG, 6, 4)} <small>USDG</small>
               </strong>
-              <p>
-                Term premium / settlement amount = {ratio(terms.netPremiumUSDG, terms.strikeAmountUSDG)}%
-                <span>Not annualized</span>
-              </p>
+              <p>{quotedApr ? `${quotedApr}% APR` : '— APR'}</p>
             </div>
             <div className="receipt-list">
               <div>
-                <span>Strategy / series</span>
+                <span>Strategy</span>
                 <strong>
                   {isPut ? 'Buy Low' : 'Sell High'} · {series?.days} days
                 </strong>
@@ -796,7 +799,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
         open={dialog === 'success'}
         onClose={() => setDialog(null)}
         title="Your position is open."
-        eyebrow={config.mode === 'demo' ? 'DEMO POSITION OPENED' : 'TESTNET POSITION OPENED'}
+        eyebrow={config.mode === 'demo' ? 'Demo position opened' : 'Testnet position opened'}
       >
         <div className="success-icon">
           <Icon name="check" size={32} />
@@ -808,11 +811,11 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
         </p>
         <p className="muted center">
           {config.mode === 'demo'
-            ? 'View the terms in My positions, or simulate both outcomes and claim your assets.'
+            ? 'View the terms in Portfolio, or simulate both outcomes and claim your assets.'
             : 'Track your position and claim your assets after exercise or expiry.'}
         </p>
         <Link href="/positions" className="button primary full" onClick={() => setDialog(null)}>
-          View my positions <Icon name="arrow" size={17} />
+          View portfolio <Icon name="arrow" size={17} />
         </Link>
         {completed?.transactionHash ? (
           <a
