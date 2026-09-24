@@ -40,7 +40,7 @@ test('testnet discovers only the deployed catalog and reads fixed terms and bala
   assert.equal(market.series[0].strikePricePerWrappedUSDG, '220374264');
   assert.equal(market.series[7].strikePricePerWrappedUSDG, '245416794');
   assert.equal(market.series[15].exerciseEnd, '1790971200');
-  assert.equal(market.feeBps, 100);
+  assert.equal(market.feeBps, 1000);
   for (const request of requests.filter((r) => r.method === 'eth_call'))
     assert.equal(request.params?.[1], '0x100');
   const balances = await adapter.balances(TEST_ACCOUNT, market, market.series[0].vault);

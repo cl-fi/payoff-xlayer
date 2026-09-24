@@ -123,7 +123,17 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     setAccepted(false);
     setMessage('');
     setBusy('');
-  }, [quantity, quantityUnit, side, series?.id, market?.rate, connection?.address, scenario, revision]);
+  }, [
+    quantity,
+    quantityUnit,
+    side,
+    series?.id,
+    market?.rate,
+    market?.feeBps,
+    connection?.address,
+    scenario,
+    revision,
+  ]);
   useEffect(
     () => () => {
       operation.current++;
@@ -697,7 +707,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                 <span>{amount(terms.grossPremiumUSDG)} USDG</span>
               </div>
               <div>
-                <span>Protocol fee</span>
+                <span>Protocol fee{quote ? ` (${quote.feeBps / 100}%)` : ''}</span>
                 <span>− {amount(terms.protocolFeeUSDG)} USDG</span>
               </div>
               <div>

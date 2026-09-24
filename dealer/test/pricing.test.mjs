@@ -24,13 +24,19 @@ test('gross basis follows the existing fee; fractional quantities and rounding s
   assert.deepEqual(calculatePremium('1000000', 10n ** 18n, 100, { ...config, premiumBasis: 'gross' }),
     { grossPremiumUSDG: '500000', protocolFeeUSDG: '5000', netPremiumUSDG: '495000' });
   assert.equal(calculatePremium('1170000', 10n ** 16n, 100, config).netPremiumUSDG, '5850');
-  for (const fee of [0, 1, 100, 9999]) {
+  for (const fee of [0, 1, 100, 1000, 9999]) {
     for (const amount of [2n, 3n, 198n, 199n, 1000001n, 9007199254740993n]) {
       const q = calculatePremium(amount, 10n ** 18n, fee, config);
       assert.equal(BigInt(q.netPremiumUSDG), amount / 2n);
       assert.equal(BigInt(q.grossPremiumUSDG) - BigInt(q.grossPremiumUSDG) * BigInt(fee) / 10000n, amount / 2n);
     }
   }
+});
+test('10% of gross premium preserves the net-bid policy and supports gross-bid pricing', () => {
+  assert.deepEqual(calculatePremium('1000000', 10n ** 18n, 1000, config),
+    { grossPremiumUSDG: '555555', protocolFeeUSDG: '55555', netPremiumUSDG: '500000' });
+  assert.deepEqual(calculatePremium('1000000', 10n ** 18n, 1000, { ...config, premiumBasis: 'gross' }),
+    { grossPremiumUSDG: '500000', protocolFeeUSDG: '50000', netPremiumUSDG: '450000' });
 });
 test('wrapped rate converts BOTH strike and quantity; put/call and expiry are exact', () => {
   const c = { ...context, assetsPerWrapped: 2n * 10n ** 18n, stockQuantity: 2n * 10n ** 18n,

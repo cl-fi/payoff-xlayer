@@ -50,7 +50,7 @@ export function validateSelection(selection: Selection, preview: Preview, market
   const fee = (BigInt(q.grossPremiumUSDG) * BigInt(market.feeBps)) / 10000n;
   if (BigInt(q.protocolFeeUSDG) !== fee || BigInt(q.netPremiumUSDG) + fee !== BigInt(q.grossPremiumUSDG))
     throw new UserFacingError('Quote fees do not match.');
-  const quote: GatewayQuote = { kind: 'gateway', requestId: q.requestId, selection };
+  const quote: GatewayQuote = { kind: 'gateway', feeBps: market.feeBps, requestId: q.requestId, selection };
   if (
     tx.chainId !== market.chainId ||
     !same(tx.from, p.taker) ||
@@ -174,6 +174,7 @@ function gatewayError(code: unknown) {
     TAKER_BALANCE: 'Insufficient collateral. Reduce the quantity or fund your wallet.',
     TAKER_ALLOWANCE: 'Approve the required collateral before requesting a quote.',
     QUOTE_EXPIRED: 'The quote expired. Request a new quote.',
+    QUOTE_FEES: 'The protocol fee changed. Request a new quote.',
     NONCE_UNAVAILABLE: 'This quote has already been used or cancelled. Request a new quote.',
     DEALER_BALANCE: 'The dealer cannot fund this quote now. Try a smaller quantity or request a new quote.',
     DEALER_ALLOWANCE: 'The dealer cannot execute this quote now. Request a new quote.',

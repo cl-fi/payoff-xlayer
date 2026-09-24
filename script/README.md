@@ -23,7 +23,7 @@ node scripts/forge.mjs script script/DeployXLayerTestnet.s.sol:DeployXLayerTestn
   --slow
 ```
 
-The dealer defaults to the deployer when omitted; use a separate funded dealer account when connecting a running dealer service. The deployer is also the administrator, fee recipient and test-stock minter. The fee defaults to 100 basis points of the gross premium. Exchange administrator and fee settings are immutable.
+The dealer defaults to the deployer when omitted; use a separate funded dealer account when connecting a running dealer service. The deployer is also the administrator, fee recipient and test-stock minter. The initial fee defaults to 1000 basis points (10%) of gross premium. The Exchange administrator can update it with `setFeeBps`; administrator and fee recipient addresses remain immutable.
 
 After checking the simulation, balances and target chain, repeat with `--broadcast`. This is a **fresh-deployment script**: rerunning it normally creates new contracts. If broadcasting stops partway through, inspect the transaction receipts and use Foundry's `--resume` for that same deployment rather than starting another deployment.
 
@@ -80,3 +80,41 @@ Prepare calendar timestamps off-chain using `America/New_York`, including daylig
 The script reuses a series only if all five terms match, including the cutoff and exercise window. It never modifies existing series. The search runs locally in the administrator script and adds no cross-series work to user transactions. Trading cutoff can equal exercise start, allowing a direct transition from accepting new positions to exercising them.
 
 If a broadcast is interrupted, inspect its receipts before using `--resume`; do not start a concurrent batch from the same signing account. Record the intended series IDs in the gateway market catalog. Omitting old samples from that catalog only changes discovery and quoting through that gateway; it does not disable on-chain series or affect existing position exits.
+
+## Replace a legacy disposable test deployment
+
+The original deployed Exchange had an immutable fee; the current source supports
+`setFeeBps(uint16)`. Because legacy bytecode cannot acquire this function, use
+`RedeployTestnetMarket.s.sol` to create a replacement Exchange/Vault with the
+existing USDG and wrapped-stock contracts, fee recipient, and reviewed Series
+terms. It accepts the former Vault, dealer, fee in basis points, expected wrapper
+rate, and Series list. The current product fee is 1000 basis points (10% of gross
+premium). No token minting or position migration occurs.
+
+Verify the new deployment before switching gateway/dealer configuration and the
+static frontend catalog. Existing allowances name a spender address: reauthorize
+the new Exchange/Vault with finite working limits, and have frontend users approve
+the new Vault through the normal preparation flow. Change any explicit Vercel
+Vault/deployment-block settings before rebuilding. Rebind the native-product and
+generation records to the new Vault. Keep cached bids, but replace the cached
+catalog and restart settlement monitoring in the new settlement domain.
+
+This procedure is for pre-public-test data the product owner has agreed to discard.
+It does not pause or alter the old deployment; its historical positions still exist
+onchain. Once the adjustable Exchange is deployed, later fee changes use the
+administrator's `setFeeBps` transaction and do not replace contracts or allowances.
+
+## Adjust the current protocol fee
+
+Call `RFQExchange.setFeeBps(newFeeBps)` from its administrator. Values are basis
+points of gross premium: 1000 = 10%, 800 = 8%, and the percentage bound is 0–10000.
+`ProtocolFeeUpdated(previousFeeBps, newFeeBps)` records the change. Existing
+positions and previously paid premiums are untouched. Pending signed quotes whose
+fee split no longer matches the current rate must be requoted; amounts are never
+rewritten under an existing signature.
+
+The dealer reads the current rate for every formal inquiry and reference cycle;
+the gateway checks it again before execution. The frontend clears pending quotes
+when a rate update arrives, and the contract remains the final check. No service
+restart or web redeployment is required to enforce a fee change. Regenerate the
+static catalog when publishing to update its initial page-load snapshot.

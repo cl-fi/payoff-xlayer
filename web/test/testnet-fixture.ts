@@ -58,7 +58,7 @@ export function fixtureRpc(request: RpcRequest): unknown {
       result = (BigInt(args![0] as bigint) * BigInt(TEST_RATE)) / 10n ** 18n;
       break;
     case 'feeBps':
-      result = 100;
+      result = catalog.feeBps;
       break;
     case 'vaultAllowed':
       result = true;

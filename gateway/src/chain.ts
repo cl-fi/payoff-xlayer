@@ -116,6 +116,10 @@ export class RpcChain implements Chain {
     // All checks and the simulation use one fresh block; no fake balance/allowance overrides.
     const snapshot = await this.snapshot(request.order);
     const blockNumber = BigInt(snapshot.blockNumber);
+    const fee = BigInt(q.grossPremiumUSDG) * BigInt(snapshot.feeBps) / 10000n;
+    if (BigInt(q.protocolFeeUSDG) !== fee || BigInt(q.netPremiumUSDG) + fee !== BigInt(q.grossPremiumUSDG)) {
+      throw new GatewayError('QUOTE_FEES', 'The protocol fee changed; request a new signed quote.');
+    }
     const now = BigInt(Math.floor(Date.now() / 1000));
     if (BigInt(q.issuedAt) > BigInt(snapshot.timestamp) || BigInt(q.deadline) < BigInt(q.issuedAt)
       || BigInt(q.deadline) <= now || BigInt(q.deadline) < BigInt(snapshot.timestamp) || BigInt(q.deadline) > BigInt(snapshot.terms.tradeCutoff)) {

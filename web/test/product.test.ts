@@ -72,6 +72,12 @@ test('English app errors remain useful while raw provider errors stay private', 
   );
 });
 
+test('demo deducts 10% of gross premium and preserves the gross/net split', () => {
+  const q = createDemoQuote(preview(0), now).quote;
+  assert.equal(market.feeBps, 1000);
+  assert.equal(BigInt(q.protocolFeeUSDG), BigInt(q.grossPremiumUSDG) / 10n);
+  assert.equal(BigInt(q.netPremiumUSDG) + BigInt(q.protocolFeeUSDG), BigInt(q.grossPremiumUSDG));
+});
 test('quantity conversion uses integer arithmetic and existing strike SDK', () => {
   const p = preview(0);
   assert.equal(p.wrappedQuantity, ((WAD * WAD) / 1003000000000000000n).toString());
@@ -227,7 +233,7 @@ test('gateway selection must match order, fee, destination and exact transaction
     checkedAtBlock: '1',
     transaction: { chainId: 1952, from: DEMO_ACCOUNT, to: market.exchange, value: '0', data: '0x' },
   };
-  const q: GatewayQuote = { kind: 'gateway', requestId: demo.requestId, selection };
+  const q: GatewayQuote = { kind: 'gateway', feeBps: market.feeBps, requestId: demo.requestId, selection };
   selection.transaction.data = expectedFillData(q, p);
   assert.equal(validateSelection(selection, p, market).kind, 'gateway');
   assert.throws(

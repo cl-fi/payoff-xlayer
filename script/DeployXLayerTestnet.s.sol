@@ -20,7 +20,7 @@ contract DeployXLayerTestnet is Script {
         address deployer = vm.envAddress("TESTNET_DEPLOYER");
         address usdg = vm.envAddress("TESTNET_USDG");
         address dealer = vm.envOr("TESTNET_DEALER", deployer);
-        uint256 feeBps = vm.envOr("TESTNET_FEE_BPS", uint256(100));
+        uint256 feeBps = vm.envOr("TESTNET_FEE_BPS", uint256(1000));
         require(deployer != address(0) && dealer != address(0), "Invalid account");
         require(usdg.code.length != 0 && IERC20Metadata(usdg).decimals() == 6, "Invalid USDG");
         require(feeBps <= 10_000, "Invalid fee");

@@ -137,7 +137,7 @@ test('selecting the 14-day series uses its actual terms and premium', async ({ p
   await expect(page.locator('.order-selection')).toHaveText('175.00 USDG · 14 days');
   await quote(page);
   await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('Buy Low · 14 days');
-  await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.66');
+  await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.42');
 });
 
 for (const side of ['Buy Low', 'Sell High'] as const) {

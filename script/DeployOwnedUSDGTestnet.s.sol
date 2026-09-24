@@ -18,7 +18,7 @@ contract DeployOwnedUSDGTestnet is Script {
         require(administrator != address(0) && dealer != address(0), "Invalid account");
         vm.startBroadcast(administrator);
         usdg = new TestnetUSDG(administrator);
-        exchange = new RFQExchange(address(usdg), administrator, administrator, 100);
+        exchange = new RFQExchange(address(usdg), administrator, administrator, 1000);
         vault = new SeriesVault(address(usdg), wrapped, administrator, address(exchange));
         exchange.setVaultAllowed(address(vault), true);
         exchange.setDealerAllowed(dealer, true);

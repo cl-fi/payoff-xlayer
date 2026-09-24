@@ -71,7 +71,7 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
   const usd = await deploy('MockUSDG'); const stock = await deploy('MockXStock');
   const wrapped = await deploy('MockWrappedXStock', [stock]);
   const feeRecipient = '0x00000000000000000000000000000000000000F0';
-  const exchange = await deploy('RFQExchange', [usd, makerA.address, feeRecipient, 100]);
+  const exchange = await deploy('RFQExchange', [usd, makerA.address, feeRecipient, 1000]);
   const vault = await deploy('SeriesVault', [usd, wrapped, makerA.address, exchange]);
   await write(owner, 'RFQExchange', exchange, 'setVaultAllowed', [vault, true]);
   for (const account of [makerA, makerB]) await write(owner, 'RFQExchange', exchange, 'setDealerAllowed', [account.address, true]);
@@ -142,11 +142,24 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
         const result = (await g.create({ ...order, seriesId }, randomUUID())).body as any;
         assert.equal(result.status, 'quoted', JSON.stringify(result));
         assert.equal(result.selection.quote.netPremiumUSDG, '500000');
+        assert.equal(result.selection.quote.grossPremiumUSDG, '555555');
+        assert.equal(result.selection.quote.protocolFeeUSDG, '55555');
         const tx = await taker.sendTransaction({ to: exchange, data: result.selection.transaction.data, value: 0n });
         assert.equal((await receipt(tx)).status, 'success');
         assert.equal((await g.transaction(result.requestId, tx)).status, 'confirmed');
       }
     } finally { await makerApp.close(); }
+  });
+  await t.test('fee change invalidates the selected split; fresh RFQs use the new rate without restarting services', async () => {
+    const previous = await rfq();
+    await write(owner, 'RFQExchange', exchange, 'setFeeBps', [800]);
+    try {
+      await assert.rejects(gateway.prepare(previous.requestId), (e: GatewayError) => e.code === 'QUOTE_FEES');
+      const next = await rfq();
+      assert.equal(next.selection.quote.protocolFeeUSDG, '240000');
+      assert.equal(next.selection.quote.netPremiumUSDG, '2760000');
+      await gateway.prepare(next.requestId);
+    } finally { await write(owner, 'RFQExchange', exchange, 'setFeeBps', [1000]); }
   });
   for (const testMode of ['bad-signature', 'wrong-domain', 'expired']) {
     await t.test(`${testMode} higher bid loses to a valid lower bid`, async () => {
@@ -234,14 +247,14 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
       await write(taker, 'MockXStock', stock, 'approve', [wrapped, 0n]);
       await write(owner, 'MockXStock', stock, 'mint', [user.address, 10n ** 18n]);
       const opened = [];
-      const adapter = { prepare: async (q: any) => ({ kind: 'gateway', requestId: q.requestId, selection: (await gateway.prepare(q.requestId)).selection }),
+      const adapter = { prepare: async (q: any) => ({ kind: 'gateway', feeBps: market.feeBps, requestId: q.requestId, selection: (await gateway.prepare(q.requestId)).selection }),
         settlement: (id: any, hash: any) => gateway.transaction(id, hash) } as unknown as GatewayAdapter;
       for (const series of market.series) {
         const preview = previewOrder('0.001', series, market, user.address);
         await trader.prepareAssets(preview, market);
         const result = (await gateway.create(preview.order, randomUUID())).body as any;
         assert.equal(result.status, 'quoted');
-        opened.push(await trader.fill(adapter, preview, { kind: 'gateway', requestId: result.requestId, selection: result.selection }, market));
+        opened.push(await trader.fill(adapter, preview, { kind: 'gateway', feeBps: market.feeBps, requestId: result.requestId, selection: result.selection }, market));
       }
       const recovered = await readPositions(c, user.address, market, publicClient as any);
       for (const p of opened) assert.ok(recovered.some(r => r.id === p.id && r.netPremiumUSDG === p.netPremiumUSDG));

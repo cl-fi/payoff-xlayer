@@ -20,6 +20,7 @@ const EXCHANGE = '0x000000000000000000000000000000000000de02' as Address;
 const VAULT = '0x000000000000000000000000000000000000de03' as Address;
 const DEALER = '0x000000000000000000000000000000000000de04' as Address;
 const RATE = '1003000000000000000';
+const FEE_BPS = 1000;
 const DAY = 86400;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const STORAGE_PREFIX = 'payoff.demo.v1.';
@@ -47,7 +48,7 @@ export function demoMarket(anchor: number): Market {
     wrappedStock: '0x000000000000000000000000000000000000de07',
     rate: RATE,
     blockNumber: '0',
-    feeBps: 100,
+    feeBps: FEE_BPS,
     series: [7, 14].flatMap((days, index) =>
       ([0, 1] as const).map((side) => ({
         id: String(index * 2 + side + 1),
@@ -161,12 +162,13 @@ export function createDemoQuote(
   expired = false,
 ): DemoQuote {
   const gross = (BigInt(preview.wrappedQuantity) * (preview.series.days === 7 ? 1800000n : 2700000n)) / WAD;
-  const fee = (gross * 100n) / 10000n;
+  const fee = (gross * BigInt(FEE_BPS)) / 10000n;
   const deadline = Math.min(now + 90, Number(preview.series.tradeCutoff));
   const requestId =
     `0x${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}` as `0x${string}`;
   return {
     kind: 'demo',
+    feeBps: FEE_BPS,
     requestId,
     dealerName: 'Payoff fixed quote · Demo',
     signature: null,

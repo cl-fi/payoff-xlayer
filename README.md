@@ -36,6 +36,8 @@ See the [fixed-token settlement design decision](design/fixed-token-settlement.m
 
 Product targets are specified per native NVDAx. A publication converts them to fixed wrapped strikes at the observed rate. After a rate change, replacement series retain the original expiry and become the frontend listings. Previous series and their positions remain valid; hiding an old listing does not revoke its outstanding quotes or block onchain entry.
 
+The protocol fee is **10% of gross premium** (`feeBps = 1000`), rounded down to USDG base units; the user receives the remaining premium. This is not a fee on collateral or exercise proceeds. The administrator can update the rate through `setFeeBps`, with a `ProtocolFeeUpdated` event; existing positions are unaffected and incompatible pending quotes must be requoted. The self-dealer currently targets net premium at 50% of the reference option bid, so it grosses up its payment to cover the fee.
+
 ## Architecture
 
 ```text

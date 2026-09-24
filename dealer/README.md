@@ -33,7 +33,7 @@ reference strike = configured referenceStrikes[seriesId], or exact wrapped strik
 target premium = floor(market bid per share × stock quantity × 50%, to 6 decimals)
 ```
 
-The default `premiumBasis: "net"` makes the target the user's net USDG receipt. For a $1 bid and one stock-equivalent unit, the user receives 0.500000 USDG; with a 1% Exchange fee the dealer pays 0.505050 USDG, including 0.005050 USDG protocol fee. Set `premiumBasis: "gross"` if the target should be before fees instead: gross 0.500000, fee 0.005000, net 0.495000. All financial arithmetic uses integers; the fee matches Solidity's floor rounding. USD and USDG are assumed 1:1 for this initial pricing rule.
+The default `premiumBasis: "net"` makes the target the user's net USDG receipt. For a $1 bid and one stock-equivalent unit, the user receives 0.500000 USDG; with the current 10% Exchange fee the dealer pays 0.555555 USDG, including 0.055555 USDG protocol fee. Set `premiumBasis: "gross"` if the target should be before fees instead: gross 0.500000, fee 0.050000, net 0.450000. All financial arithmetic uses integers; the fee matches Solidity's floor rounding. USD and USDG are assumed 1:1 for this initial pricing rule.
 
 Option bid is quoted **per share**. Do not multiply by the standard listed-option contract size of 100. Fractional wrapped quantities are supported. The wrapper and its underlying must both use 18 decimals, matching the current protocol. A missing or invalid bid for the selected reference declines; another strike is never silently substituted. Configure reference mappings deliberately when publishing new series.
 

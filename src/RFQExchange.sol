@@ -18,7 +18,7 @@ contract RFQExchange is EIP712, ReentrancyGuard {
     IERC20 public immutable usdg;
     address public immutable administrator;
     address public immutable feeRecipient;
-    uint16 public immutable feeBps;
+    uint16 public feeBps;
     bool public newPositionsPaused;
     address[] private _vaults;
     mapping(address => bool) public registeredVault;
@@ -53,6 +53,7 @@ contract RFQExchange is EIP712, ReentrancyGuard {
         uint256 netPremiumUSDG
     );
     event NewPositionsPauseChanged(bool paused);
+    event ProtocolFeeUpdated(uint16 previousFeeBps, uint16 newFeeBps);
 
     constructor(address usdg_, address administrator_, address feeRecipient_, uint16 feeBps_)
         EIP712("Payoff RFQ", "2")
@@ -97,6 +98,16 @@ contract RFQExchange is EIP712, ReentrancyGuard {
         _onlyAdmin();
         newPositionsPaused = paused;
         emit NewPositionsPauseChanged(paused);
+    }
+
+    /// @notice Set the fee on future fills. Existing positions and paid premiums are unaffected.
+    /// @dev Quotes with a fee split that no longer matches must be signed again, never rewritten.
+    function setFeeBps(uint16 newFeeBps) external {
+        _onlyAdmin();
+        if (newFeeBps > 10_000) revert InvalidConfiguration();
+        uint16 previousFeeBps = feeBps;
+        feeBps = newFeeBps;
+        emit ProtocolFeeUpdated(previousFeeBps, newFeeBps);
     }
 
     function cancelNonce(uint256 nonce) external {

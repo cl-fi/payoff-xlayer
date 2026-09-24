@@ -37,13 +37,14 @@ export type Preview = {
 };
 export type DemoQuote = {
   kind: 'demo';
+  feeBps: number;
   requestId: string;
   quote: Quote;
   dealerName: string;
   signature: null;
   transaction: null;
 };
-export type GatewayQuote = { kind: 'gateway'; requestId: string; selection: Selection };
+export type GatewayQuote = { kind: 'gateway'; feeBps: number; requestId: string; selection: Selection };
 export type AppQuote = DemoQuote | GatewayQuote;
 export type PositionStatus = 'open' | 'exercised' | 'expired' | 'claimed';
 export type Position = {

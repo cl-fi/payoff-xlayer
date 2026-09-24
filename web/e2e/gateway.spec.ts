@@ -4,6 +4,112 @@ import deployment from '../../config/xlayer-testnet.json' with { type: 'json' };
 import { fixtureRpc, TEST_ACCOUNT, TEST_NOW } from '../test/testnet-fixture';
 import { exchangeAbi, faucetAbi, tokenAbi, vaultAbi, wrapperAbi } from '../src/lib/chain';
 import { referenceFixture } from '../test/reference-fixture';
+import { expectedFillData } from '../src/lib/chain';
+import catalog from '../public/catalog.json' with { type: 'json' };
+import { createDemoQuote } from '../src/lib/data/demo';
+import { previewOrder } from '../src/lib/amounts';
+import type { GatewayQuote, Market } from '../src/lib/types';
+
+test('confirmed quote shows its checked fee and a later fee update clears it', async ({ page }) => {
+  await page.clock.install({ time: TEST_NOW });
+  let publishedFee = 1000;
+  const checkedFee = 800;
+  const listing = catalog.markets[0];
+  const market = {
+    ...listing,
+    chainId: 1952,
+    exchange: catalog.exchange,
+    usdg: catalog.usdg,
+    feeBps: catalog.feeBps,
+    blockNumber: catalog.blockNumber,
+    series: listing.series.map((s) => ({ ...s, vault: listing.vault, days: 0 })),
+  } as Market;
+  await page.route('https://gateway.example.test/**', async (route) => {
+    if (route.request().url().endsWith('/v1/reference-quotes')) {
+      const refs = referenceFixture();
+      refs.markets.forEach((m) => {
+        m.feeBps = publishedFee;
+      });
+      await route.fulfill({ json: refs });
+      return;
+    }
+    expect(route.request().url()).toMatch(/\/v1\/rfqs$/);
+    const order = route.request().postDataJSON();
+    const series = market.series.find((s) => s.id === order.seriesId)!;
+    const preview = previewOrder('0.001', series, market, TEST_ACCOUNT);
+    expect(order.wrappedQuantity).toBe(preview.wrappedQuantity);
+    const demo = createDemoQuote(preview, Math.floor(+TEST_NOW / 1000));
+    const fee = (BigInt(demo.quote.grossPremiumUSDG) * BigInt(checkedFee)) / 10000n;
+    const quote: GatewayQuote = {
+      kind: 'gateway',
+      feeBps: checkedFee,
+      requestId: demo.requestId,
+      selection: {
+        quote: {
+          ...demo.quote,
+          protocolFeeUSDG: String(fee),
+          netPremiumUSDG: String(BigInt(demo.quote.grossPremiumUSDG) - fee),
+          deadline: String(Math.floor(+TEST_NOW / 1000) + 300),
+        },
+        signature: '0x',
+        quoteHash: `0x${'11'.repeat(32)}`,
+        dealerId: 'fixture',
+        dealerName: 'Fixture dealer',
+        source: 'test',
+        checkedAt: TEST_NOW.toISOString(),
+        checkedAtBlock: '256',
+        transaction: {
+          chainId: 1952,
+          from: TEST_ACCOUNT,
+          to: market.exchange,
+          value: '0',
+          data: '0x',
+        },
+      },
+    };
+    quote.selection.transaction.data = expectedFillData(quote, preview);
+    await route.fulfill({ json: { status: 'quoted', selection: quote.selection } });
+  });
+  await page.route(deployment.rpcUrl, async (route) => {
+    const request = route.request().postDataJSON();
+    let result;
+    if (request.method === 'eth_call') {
+      const { functionName } = decodeFunctionData({
+        abi: [...vaultAbi, ...tokenAbi, ...wrapperAbi, ...exchangeAbi],
+        data: request.params[0].data,
+      });
+      if (functionName === 'feeBps')
+        result = encodeFunctionResult({ abi: exchangeAbi, functionName, result: checkedFee });
+      if (functionName === 'nextPositionId')
+        result = encodeFunctionResult({ abi: vaultAbi, functionName, result: 1n });
+      if (functionName === 'allowance')
+        result = encodeFunctionResult({ abi: tokenAbi, functionName, result: 10000000n });
+    }
+    await route.fulfill({ json: { jsonrpc: '2.0', id: request.id, result: result ?? fixtureRpc(request) } });
+  });
+  await page.addInitScript((account) => {
+    (window as any).ethereum = {
+      request: async ({ method }: { method: string }) => {
+        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [account];
+        if (method === 'eth_chainId') return '0x7a0';
+        throw new Error('No transaction is allowed in this test');
+      },
+      on() {},
+      removeListener() {},
+    };
+  }, TEST_ACCOUNT);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
+  await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
+  await page.getByLabel('Quantity', { exact: true }).fill('0.001');
+  await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
+  // Reference data still says 10%, but the checked signed quote uses 8%.
+  await expect(page.getByRole('dialog')).toContainText('Protocol fee (8%)');
+  publishedFee = 600;
+  await page.clock.runFor(31000);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Get a quote', exact: true })).toBeEnabled();
+});
 
 test('test-token page validates amounts and asks the wallet to mint the selected quantity', async ({
   page,
