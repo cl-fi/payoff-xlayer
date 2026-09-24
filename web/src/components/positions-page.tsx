@@ -118,7 +118,7 @@ function TradingPositions() {
         <div>
           <span>Total net premiums</span>
           <strong className="teal-text">
-            {positionsError || loading ? '—' : amount(earned, 6, 6)} <small>USDG</small>
+            {positionsError || loading ? '—' : amount(earned)} <small>USDG</small>
           </strong>
           <p>Collected at opening</p>
         </div>
@@ -230,7 +230,7 @@ function TradingPositions() {
                   <small>{amount(p.strikeAmountUSDG)} USDG</small>
                 </span>
                 <span className="teal-text">
-                  <strong>+{amount(p.netPremiumUSDG, 6, 4)}</strong>
+                  <strong>+{amount(p.netPremiumUSDG)}</strong>
                   <small>USDG · Collected</small>
                 </span>
                 <span>
@@ -301,7 +301,7 @@ function TradingPositions() {
             <div className="premium-display compact">
               <span>Net premium collected</span>
               <strong>
-                +{amount(position.netPremiumUSDG, 6, 4)} <small>USDG</small>
+                +{amount(position.netPremiumUSDG)} <small>USDG</small>
               </strong>
             </div>
             <div className="receipt-list">

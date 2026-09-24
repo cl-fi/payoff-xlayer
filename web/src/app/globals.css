@@ -474,20 +474,6 @@ summary:focus-visible {
 .strategy-tabs button.selected svg {
   color: var(--n-900);
 }
-.chart-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--n-500);
-}
-.chart-heading span:first-child {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--n-900);
-}
 .nvda-chart {
   margin: 0 24px;
   padding: 16px 0 20px;
@@ -635,8 +621,8 @@ summary:focus-visible {
 }
 .scenario-plot {
   position: relative;
-  height: 160px;
-  margin-top: 12px;
+  height: 180px;
+  margin-top: 16px;
   font-size: 12px;
   color: var(--n-500);
 }
@@ -705,101 +691,115 @@ summary:focus-visible {
   font-weight: 500;
   color: var(--n-900);
 }
-.scenario-chip {
+.scenario-note {
   position: absolute;
-  right: calc(8.33% + 14px);
-  transform: translateY(-50%);
-  padding: 4px 9px;
-  border-radius: 6px;
+  top: 8px;
+  left: 10px;
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--n-300);
+}
+/* Anchored to the end of the path on its left: above the dot when the price finishes above the target,
+   below it otherwise, so the last leg of the line stays visible. */
+.scenario-bubble {
+  position: absolute;
+  right: calc(8.33% + 10px);
+  display: grid;
+  gap: 1px;
+  max-width: 64%;
+  padding: 6px 10px;
+  border-radius: 8px;
   background: var(--n-900);
   color: var(--n-0);
-  font-weight: 500;
-  white-space: nowrap;
+  text-align: center;
+  transform: translateY(calc(-100% - 12px));
   transition: top 0.35s ease;
+}
+.scenario-bubble.below {
+  transform: translateY(12px);
+}
+.scenario-bubble small {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--n-300);
+}
+.scenario-bubble b {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--n-0);
+  overflow-wrap: anywhere;
+}
+.scenario-toggle {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--n-100);
+  border-radius: 9px;
+}
+.scenario-toggle button {
+  flex: 1 1 0;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--n-700);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.scenario-toggle button:hover {
+  color: var(--n-900);
+}
+.scenario-toggle button[aria-pressed='true'] {
+  background: var(--n-0);
+  color: var(--n-900);
+  box-shadow: var(--shadow-1);
 }
 .scenario-axis {
   position: relative;
-  height: 20px;
-  margin-top: 8px;
+  height: 34px;
+  margin-top: 10px;
   font-size: 12px;
   color: var(--n-500);
 }
 .scenario-axis span {
   position: absolute;
   top: 0;
+  display: grid;
+  gap: 2px;
+  text-align: center;
   white-space: nowrap;
+}
+.scenario-axis span b {
+  font-weight: 500;
+  color: var(--n-700);
 }
 .scenario-axis span:first-child {
   left: 8.33%;
-  transform: translateX(-4px);
-}
-.scenario-axis span:nth-child(2) {
-  left: 50%;
   transform: translateX(-50%);
-  color: var(--n-700);
 }
 .scenario-axis span:last-child {
   right: 8.33%;
-  transform: translateX(4px);
+  transform: translateX(50%);
 }
-.scenario-outcomes {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  margin-top: 16px;
-}
-.scenario-outcome {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  padding: 14px;
-  text-align: left;
-  background: var(--n-0);
-  border: 1px solid var(--n-200);
-  border-radius: var(--r-sm);
-  color: var(--n-900);
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-.scenario-outcome:hover {
-  border-color: var(--n-300);
-}
-.scenario-outcome.selected {
-  border-color: var(--n-900);
-  box-shadow: inset 0 0 0 1px var(--n-900);
-}
-.scenario-outcome-head {
-  display: grid;
-  gap: 2px;
-}
-.scenario-outcome-head strong {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.scenario-outcome-head strong::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1.5px solid var(--n-900);
-  flex-shrink: 0;
-}
-.scenario-outcome.selected .scenario-outcome-head strong::before {
-  background: var(--n-900);
-}
-.scenario-outcome-head small {
-  font-size: 12px;
-  color: var(--n-500);
-  padding-left: 16px;
+.scenario-result {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--n-100);
 }
 .scenario-receipt {
   display: grid;
-  gap: 5px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 13px;
 }
 .scenario-receipt > span {
   display: flex;
@@ -808,11 +808,20 @@ summary:focus-visible {
 }
 .scenario-receipt > span > span:first-child {
   color: var(--n-500);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
+/* Values are flex rows so token amounts wrap as units and the "+" between them stays aligned. */
 .scenario-receipt > span > span:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px 5px;
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--mono);
   text-align: right;
-  overflow-wrap: anywhere;
 }
 .scenario-receipt > span.muted > span:last-child {
   font-family: var(--sans);
@@ -820,12 +829,31 @@ summary:focus-visible {
 }
 .scenario-receipt > span.strong {
   margin-top: 2px;
-  padding-top: 7px;
+  padding-top: 8px;
   border-top: 1px dashed var(--n-300);
   font-weight: 600;
 }
 .scenario-receipt > span.strong > span:first-child {
   color: var(--n-900);
+}
+.scenario-premium {
+  white-space: nowrap;
+}
+.scenario-premium::before {
+  content: '+';
+}
+.asset-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.scenario-apr {
+  margin-left: 3px;
+  font-family: var(--sans);
+  font-weight: 500;
+  color: var(--pay);
+  white-space: nowrap;
 }
 .fine-print {
   font-size: 12px;
@@ -872,17 +900,6 @@ summary:focus-visible {
 }
 .quantity-label label {
   cursor: pointer;
-}
-.field-aside {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 4px 12px;
-  min-width: 0;
-}
-.field-aside .text-link {
-  font-size: 12px;
 }
 .scenario-list label.selected {
   border-color: var(--n-900);
@@ -996,7 +1013,6 @@ summary:focus-visible {
 .quantity-input.invalid:focus-within {
   box-shadow: 0 0 0 3px var(--neg-tint);
 }
-.input-help,
 .field-error {
   font-size: 12px;
   line-height: 1.55;
@@ -1005,43 +1021,6 @@ summary:focus-visible {
 }
 .field-error {
   color: var(--neg);
-}
-.order-summary {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--n-200);
-  display: grid;
-  gap: 12px;
-  font-size: 13px;
-}
-.order-summary > div {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-}
-.order-summary > div > span:first-child {
-  color: var(--n-500);
-}
-.order-summary strong {
-  font-size: 13px;
-  font-weight: 600;
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.summary-apr {
-  margin-left: 8px;
-  padding-left: 8px;
-  border-left: 1px solid var(--n-200);
-  color: var(--pay);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.reference-note {
-  color: var(--n-500);
-  font-size: 12px;
-  line-height: 1.55;
-  margin: 10px 0 0;
 }
 .available-balance {
   display: inline-flex;
@@ -2048,9 +2027,6 @@ input[type='checkbox'] {
     padding-left: 24px;
     padding-right: 24px;
   }
-  .scenario-outcomes {
-    grid-template-columns: 1fr 1fr;
-  }
   .order-card {
     padding: 24px;
   }
@@ -2216,10 +2192,20 @@ input[type='checkbox'] {
     white-space: normal;
   }
   .scenario-plot {
-    height: 150px;
+    height: 165px;
   }
-  .scenario-outcomes {
-    grid-template-columns: 1fr;
+  .scenario-toggle button {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .scenario-receipt {
+    font-size: 12px;
+  }
+  .scenario-bubble {
+    max-width: 84%;
+  }
+  .scenario-bubble b {
+    font-size: 12px;
   }
   .unit-toggle button {
     padding: 4px 7px;

@@ -1,13 +1,16 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { amount } from '@/lib/amounts';
+import { TokenIcon } from './token-icon';
 
-// Two settlement scenarios for the current order, with an illustrative price path. The figures are the
-// order's fixed terms; the path is a drawing, not a forecast. The dealer decides whether to exercise.
+// One settlement outcome at a time for the current order, chosen with the toggle above an illustrative
+// price path. The figures are the order's fixed terms; the path is a drawing, not a forecast. Exercise is
+// the dealer's decision (see Details); at exactly the target the order is shown as settling in USDG.
 const START_X = 60,
   END_X = 660,
   TARGET_Y = 150,
-  ABOVE_Y = 84,
-  BELOW_Y = 222;
+  ABOVE_Y = 105,
+  BELOW_Y = 180;
 
 type Outcome = 'above' | 'below';
 
@@ -19,18 +22,27 @@ export function ScenarioPreview({
   quantity,
   usdg,
   premium,
-  total,
-  expiry,
+  premiumLabel,
+  premiumStatus,
+  apr,
+  start,
+  settle,
 }: {
   isPut: boolean;
   unit: string;
   approximate: boolean;
   target: string | null;
   quantity: string | null;
+  /** USDG collateral (Buy Low) or sale proceeds (Sell High), in USDG base units. */
   usdg: string | null;
+  /** Net premium in USDG base units, or null while it is unknown. */
   premium: string | null;
-  total: string | null;
-  expiry: string | null;
+  premiumLabel: string;
+  /** Shown in place of the premium while it is unknown. */
+  premiumStatus: string;
+  apr: string | null;
+  start: string | null;
+  settle: string | null;
 }) {
   const [scenario, setScenario] = useState<Outcome>('above');
   const above = scenario === 'above';
@@ -38,71 +50,69 @@ export function ScenarioPreview({
   const endY = above ? ABOVE_Y : BELOW_Y;
   const path = `M${START_X},${startY} C170,${startY - 60} 250,${startY + 70} 350,${TARGET_Y} S560,${endY + (above ? 30 : -30)} ${END_X},${endY}`;
   const q = quantity ? `${approximate ? '≈ ' : ''}${quantity} ${unit}` : '—';
-  const money = (value: string | null) => (value ? `${value} USDG` : '—');
-  const premiumRow = {
-    label: 'Premium · paid upfront',
-    value: premium ? `+${premium} USDG` : 'Set by dealer quote',
-    muted: !premium,
+  // USDG figures are shown to two decimals; the exact settlement amount stays in Details.
+  const moneyText = (value: string | null) => (value ? `${amount(value)} USDG` : '—');
+  // Asset rows carry the token logo; prices and figures stay plain text.
+  const money = (value: string | null) =>
+    value ? (
+      <span className="asset-amount">
+        <TokenIcon symbol="USDG" size={14} />
+        {moneyText(value)}
+      </span>
+    ) : (
+      '—'
+    );
+  const stock = (
+    <span className="asset-amount">
+      <TokenIcon symbol={unit} size={14} />
+      {q}
+    </span>
+  );
+  const price = target ? `${target} USDG` : '—';
+  const total = usdg && premium ? (BigInt(usdg) + BigInt(premium)).toString() : null;
+  // Settlement in USDG (unexercised Buy Low, exercised Sell High) or in stock plus the premium.
+  const cashText = total ? moneyText(total) : `${moneyText(usdg)} + premium`;
+  const stockText = `${q} + ${premium ? moneyText(premium) : 'premium'}`;
+  const cash = total ? money(total) : <>{money(usdg)} + premium</>;
+  const stockAndPremium = (
+    <>
+      {stock} + {premium ? money(premium) : 'premium'}
+    </>
+  );
+  // The unexercised side includes the target itself: "At or above" for Buy Low, "At or below" for Sell High.
+  const label = (key: Outcome) => {
+    const held = isPut === (key === 'above');
+    const word = key === 'above' ? (held ? 'At or above' : 'Above') : held ? 'At or below' : 'Below';
+    return `${word} ${target ?? '—'}`;
   };
-  const cards: {
-    key: Outcome;
-    title: string;
-    verdict: string;
-    rows: { label: string; value: string; muted?: boolean; strong?: boolean }[];
-  }[] = [
-    {
-      key: 'above',
-      title: `Above ${target ?? '—'}`,
-      verdict: isPut
-        ? 'Expires unexercised · you keep your USDG'
-        : 'Dealer may exercise · you sell at the target',
-      rows: isPut
-        ? [
-            { label: 'USDG returned', value: money(usdg) },
-            premiumRow,
-            { label: 'Total', value: total ? `${total} USDG` : `${money(usdg)} + premium`, strong: true },
-          ]
-        : [
-            { label: `${unit} sold`, value: q },
-            { label: '× Target price', value: money(target) },
-            { label: 'Sale proceeds', value: money(usdg) },
-            premiumRow,
-            { label: 'Total', value: total ? `${total} USDG` : `${money(usdg)} + premium`, strong: true },
-          ],
-    },
-    {
-      key: 'below',
-      title: `At or below ${target ?? '—'}`,
-      verdict: isPut
-        ? 'Dealer may exercise · you buy at the target'
-        : 'Expires unexercised · you keep your stock',
-      rows: isPut
-        ? [
-            { label: 'USDG locked', value: money(usdg) },
-            { label: '÷ Target price', value: money(target) },
-            { label: 'You buy', value: q },
-            premiumRow,
-            { label: 'You hold', value: `${q} + ${premium ? `${premium} USDG` : 'premium'}`, strong: true },
-          ]
-        : [
-            { label: `${unit} returned`, value: q },
-            premiumRow,
-            { label: 'You hold', value: `${q} + ${premium ? `${premium} USDG` : 'premium'}`, strong: true },
-          ],
-    },
-  ];
-  const chip = isPut
+  const rows: { label: string; value: ReactNode }[] = isPut
     ? above
-      ? `Keep ${money(usdg)}`
-      : `Buy ${q} at ${target ?? '—'}`
+      ? [{ label: 'Deposit', value: money(usdg) }]
+      : [
+          { label: 'Deposit', value: money(usdg) },
+          { label: '÷ Target price', value: price },
+        ]
     : above
-      ? `Sell for ${money(usdg)}`
-      : `Keep ${q}`;
+      ? [
+          { label: 'Deposit', value: stock },
+          { label: '× Target price', value: price },
+          { label: 'Sale proceeds', value: moneyText(usdg) },
+        ]
+      : [{ label: 'Deposit', value: stock }];
   return (
     <figure className="scenario-panel" aria-label="Settlement scenarios">
-      <div className="chart-heading">
-        <span>At expiry{expiry ? ` · ${expiry}` : ''}</span>
-        <span>Illustrative</span>
+      <div className="scenario-toggle" role="group" aria-label="Settlement outcome">
+        {(['above', 'below'] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={scenario === key}
+            data-testid={`scenario-${key}`}
+            onClick={() => setScenario(key)}
+          >
+            {label(key)}
+          </button>
+        ))}
       </div>
       <div className={`scenario-plot ${isPut ? 'put' : 'call'}`}>
         <svg viewBox="0 0 720 300" preserveAspectRatio="none" aria-hidden="true">
@@ -113,7 +123,7 @@ export function ScenarioPreview({
           <path className="scenario-path" d={path} />
         </svg>
         <span className="scenario-target" style={{ top: `${(TARGET_Y / 300) * 100}%` }}>
-          Target <b>{target ?? '—'}</b>
+          Target price <b>{target ?? '—'}</b>
         </span>
         <span
           className="scenario-dot start"
@@ -123,38 +133,50 @@ export function ScenarioPreview({
           className="scenario-dot end"
           style={{ left: `${(END_X / 720) * 100}%`, top: `${(endY / 300) * 100}%` }}
         />
-        <span className="scenario-chip" style={{ top: `${(endY / 300) * 100}%` }}>
-          {chip}
+        <p className="scenario-note">Illustrative only</p>
+        <span className={`scenario-bubble${above ? '' : ' below'}`} style={{ top: `${(endY / 300) * 100}%` }}>
+          <small>You receive</small>
+          <b>{above ? cashText : stockText}</b>
         </span>
       </div>
       <div className="scenario-axis">
-        <span>Today</span>
-        <span>Expiry</span>
+        <span>
+          Start<b>{start ?? '—'}</b>
+        </span>
+        <span>
+          Settle<b>{settle ?? '—'}</b>
+        </span>
       </div>
-      <div className="scenario-outcomes">
-        {cards.map((card) => (
-          <button
-            key={card.key}
-            type="button"
-            className={`scenario-outcome ${scenario === card.key ? 'selected' : ''}`}
-            aria-pressed={scenario === card.key}
-            data-testid={`scenario-${card.key}`}
-            onClick={() => setScenario(card.key)}
-          >
-            <span className="scenario-outcome-head">
-              <strong>{card.title}</strong>
-              <small>{card.verdict}</small>
+      <div className="scenario-result" data-testid="scenario-outcome" aria-live="polite">
+        <div className="scenario-receipt">
+          {rows.map((row) => (
+            <span key={row.label}>
+              <span>{row.label}</span>
+              <span>{row.value}</span>
             </span>
-            <span className="scenario-receipt">
-              {card.rows.map((row) => (
-                <span key={row.label} className={row.strong ? 'strong' : row.muted ? 'muted' : undefined}>
-                  <span>{row.label}</span>
-                  <span>{row.value}</span>
+          ))}
+          <span className={premium ? undefined : 'muted'}>
+            <span>{premiumLabel} · paid upfront</span>
+            <span>
+              <span
+                data-testid="reference-premium"
+                className={premium ? 'scenario-premium teal-text' : undefined}
+              >
+                {premium ? moneyText(premium) : premiumStatus}
+              </span>
+              {apr && (
+                <span className="scenario-apr">
+                  <span data-testid="reference-apr">{apr}%</span> APR
                 </span>
-              ))}
+              )}
             </span>
-          </button>
-        ))}
+          </span>
+          <span className="strong">
+            <span>You receive</span>
+            {/* Above the target settles in USDG on both sides (Buy Low unexercised, Sell High sold). */}
+            <span>{above ? cash : stockAndPremium}</span>
+          </span>
+        </div>
       </div>
     </figure>
   );

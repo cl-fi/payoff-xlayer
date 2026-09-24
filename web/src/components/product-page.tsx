@@ -242,8 +242,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
         : stockTarget(series, market.rate)
       : null;
   const displayQuantity = preview ? (wrappedInput ? preview.wrappedQuantity : preview.stockEquivalent) : null;
-  const settlementTotal =
-    preview && estimate ? BigInt(preview.strikeAmountUSDG) + BigInt(estimate.netPremiumUSDG) : null;
   const expiryLabel = (s: { exerciseEnd: string; days: number }) =>
     config.mode === 'demo' ? `${s.days} days` : dateOnly(s.exerciseEnd, timeZone);
   return (
@@ -399,16 +397,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                   : 'No open series'}
               </span>
             </div>
-            {config.mode !== 'demo' && (
-              <button
-                className="icon-button"
-                aria-label="Refresh onchain data"
-                disabled={loading}
-                onClick={() => void reload()}
-              >
-                <Icon name="refresh" size={16} />
-              </button>
-            )}
           </div>
           {readOnly && (
             <div className="notice availability-notice" role="status">
@@ -428,28 +416,28 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                   ? amount(displayQuantity, 18, 6)
                   : rounded(displayQuantity, 18, 4)
             }
-            usdg={preview ? amount(preview.strikeAmountUSDG) : null}
-            premium={estimate ? amount(estimate.netPremiumUSDG) : null}
-            total={settlementTotal === null ? null : amount(settlementTotal)}
-            expiry={series ? dateOnly(series.exerciseEnd, timeZone) : null}
+            usdg={preview?.strikeAmountUSDG ?? null}
+            premium={estimate?.netPremiumUSDG ?? null}
+            premiumLabel={config.mode === 'gateway' ? 'Est. premium' : 'Premium'}
+            premiumStatus={
+              config.mode !== 'gateway'
+                ? 'Available after quoting'
+                : !references && !referenceError
+                  ? 'Loading reference…'
+                  : 'Temporarily unavailable'
+            }
+            apr={estimatedApr}
+            start={now ? dateOnly(now / 1000, timeZone) : null}
+            settle={series ? dateOnly(series.exerciseEnd, timeZone) : null}
           />
           <div className="field-label quantity-label">
             <label htmlFor="quantity">Quantity</label>
-            {(balances || config.mode === 'gateway') && (
-              <span className="field-aside">
-                {balances && (
-                  <span className="available-balance">
-                    <Icon name="wallet" size={13} />
-                    {isPut
-                      ? `${amount(balances.usdg)} USDG`
-                      : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
-                  </span>
-                )}
-                {config.mode === 'gateway' && (
-                  <Link className="text-link" href={`/faucet#${isPut ? 'usdg' : 'stock'}`}>
-                    {isPut ? 'Get test USDG' : 'Get test NVIDIA'}
-                  </Link>
-                )}
+            {balances && (
+              <span className="available-balance">
+                <Icon name="wallet" size={13} />
+                {isPut
+                  ? `${amount(balances.usdg)} USDG`
+                  : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
               </span>
             )}
           </div>
@@ -460,7 +448,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               autoComplete="off"
               value={quantity}
               aria-invalid={!!calculation.error}
-              aria-describedby={calculation.error ? 'quantity-error' : 'quantity-help'}
+              aria-describedby={calculation.error ? 'quantity-error' : undefined}
               onChange={(e) => setQuantity(e.target.value)}
             />
             <div className="unit-toggle" role="group" aria-label="Quantity unit">
@@ -474,62 +462,15 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               </button>
             </div>
           </div>
-          {calculation.error ? (
+          {calculation.error && (
             <p id="quantity-error" className="field-error">
               {calculation.error}
-            </p>
-          ) : (
-            <p id="quantity-help" className="input-help">
-              {wrappedInput
-                ? `≈ ${preview ? amount(preview.stockEquivalent, 18, 6) : '—'} NVDAx at today's rate`
-                : `≈ ${preview ? amount(preview.wrappedQuantity, 18, 6) : '—'} wNVDAx · fixed at settlement`}
             </p>
           )}
           {balancesError && (
             <div className="notice" role="status">
               {balancesError}
             </div>
-          )}
-          <div className="order-summary">
-            <div>
-              <span>You lock</span>
-              <strong>
-                {preview
-                  ? isPut
-                    ? `${amount(preview.strikeAmountUSDG)} USDG`
-                    : `${amount(preview.wrappedQuantity, 18, 6)} wNVDAx`
-                  : '—'}
-              </strong>
-            </div>
-            <div>
-              <span>{config.mode === 'gateway' ? 'Est. premium' : 'Premium'}</span>
-              <strong>
-                <span data-testid="reference-premium" className={estimate ? 'teal-text' : undefined}>
-                  {config.mode !== 'gateway'
-                    ? 'Available after quoting'
-                    : estimate
-                      ? `${amount(estimate.netPremiumUSDG, 6, 6)} USDG`
-                      : !references && !referenceError
-                        ? 'Loading reference…'
-                        : 'Temporarily unavailable'}
-                </span>
-                {estimatedApr && (
-                  <span className="summary-apr">
-                    <span data-testid="reference-apr">{estimatedApr}%</span> APR
-                  </span>
-                )}
-              </strong>
-            </div>
-          </div>
-          {config.mode === 'gateway' && (
-            <p className="reference-note" role="status">
-              {estimate
-                ? `${estimate.live ? 'Live market bid' : 'Last valid market bid'} · ${dateTime(
-                    estimate.quote.marketTimestampMs / 1000,
-                    'America/New_York',
-                  )}${estimate.delayed || referenceError ? ' · Updates delayed' : ''} · Final premium confirmed in your quote`
-                : referenceError || 'Final premium is confirmed in your quote'}
-            </p>
           )}
           {message && !dialog && (
             <div role="alert" className="notice">
@@ -571,6 +512,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               <dl>
                 <dt>Delivery quantity</dt>
                 <dd>{precise(preview.wrappedQuantity)} wNVDAx</dd>
+                <dt>NVDAx equivalent</dt>
+                <dd>≈ {rounded(preview.stockEquivalent, 18, 6)} NVDAx at today&apos;s rate</dd>
                 <dt>Settlement amount</dt>
                 <dd>{precise(preview.strikeAmountUSDG, 6)} USDG</dd>
                 {config.mode !== 'demo' && (
@@ -730,7 +673,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             <div className="premium-display">
               <span>Premium · paid upfront</span>
               <strong>
-                {amount(terms.netPremiumUSDG, 6, 4)} <small>USDG</small>
+                {amount(terms.netPremiumUSDG)} <small>USDG</small>
               </strong>
               <p>{quotedApr ? `${quotedApr}% APR` : '— APR'}</p>
             </div>
@@ -751,11 +694,11 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               </div>
               <div>
                 <span>Gross premium</span>
-                <span>{amount(terms.grossPremiumUSDG, 6, 4)} USDG</span>
+                <span>{amount(terms.grossPremiumUSDG)} USDG</span>
               </div>
               <div>
                 <span>Protocol fee</span>
-                <span>− {amount(terms.protocolFeeUSDG, 6, 4)} USDG</span>
+                <span>− {amount(terms.protocolFeeUSDG)} USDG</span>
               </div>
               <div>
                 <span>Quoted by</span>
@@ -806,8 +749,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
         </div>
         <p className="success-copy">
           {config.mode === 'demo' ? 'Demo position created.' : 'Your transaction is confirmed.'}{' '}
-          <strong>{completed && amount(completed.netPremiumUSDG, 6, 4)} USDG</strong> in net premium has been
-          added to your {config.mode === 'demo' ? 'demo balance' : 'wallet'}.
+          <strong>{completed && amount(completed.netPremiumUSDG)} USDG</strong> in net premium has been added
+          to your {config.mode === 'demo' ? 'demo balance' : 'wallet'}.
         </p>
         <p className="muted center">
           {config.mode === 'demo'

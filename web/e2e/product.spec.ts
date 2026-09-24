@@ -137,7 +137,7 @@ test('selecting the 14-day series uses its actual terms and premium', async ({ p
   await expect(page.locator('.order-selection')).toHaveText('175.00 USDG · 14 days');
   await quote(page);
   await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('Buy Low · 14 days');
-  await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.6650');
+  await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.66');
 });
 
 for (const side of ['Buy Low', 'Sell High'] as const) {
@@ -155,10 +155,11 @@ for (const side of ['Buy Low', 'Sell High'] as const) {
     await expect(page.locator('.offer-table tr:has(button[aria-pressed="true"]) th')).toHaveText(
       side === 'Buy Low' ? '175.52' : '185.55',
     );
-    await expect(page.locator('#quantity-help')).toContainText('1.003000 NVDAx');
+    await expect(order.locator('.technical-details')).toContainText('1.003000 NVDAx');
     await expect(page.getByTestId('wrapping-rate')).toContainText('1 wNVDAx = 1.003 NVDAx');
     // The settlement scenario that delivers stock shows the same fixed wrapped quantity as the order.
-    await expect(page.getByTestId(side === 'Buy Low' ? 'scenario-below' : 'scenario-above')).toContainText(
+    await page.getByTestId(side === 'Buy Low' ? 'scenario-below' : 'scenario-above').click();
+    await expect(page.getByTestId('scenario-outcome')).toContainText(
       side === 'Buy Low' ? '1.000000 wNVDAx + premium' : 'Sale proceeds185.55 USDG',
     );
     await quote(page);

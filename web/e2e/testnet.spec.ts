@@ -134,7 +134,8 @@ test('RPC failure stays unavailable instead of showing demo data; reload recover
   await connect(page);
   await expect(page.locator('.available-balance')).toContainText('10.00 USDG');
   options.offline = true;
-  await page.getByRole('button', { name: 'Refresh onchain data' }).click();
+  // A storage event from another tab triggers the same in-place reload as wallet activity.
+  await page.evaluate(() => window.dispatchEvent(new Event('storage')));
   await expect(page.locator('.global-alert[role=alert]')).toBeVisible();
   await expect(page.locator('.available-balance')).toHaveCount(0);
 });

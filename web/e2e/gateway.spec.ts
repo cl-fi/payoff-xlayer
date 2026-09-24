@@ -74,8 +74,9 @@ test('test-token page validates amounts and asks the wallet to mint the selected
   await page.getByRole('link', { name: 'Try Sell High' }).click();
   await expect(page.getByRole('heading', { name: 'Sell High order' })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Sell High/ })).toHaveAttribute('aria-selected', 'true');
-  await page.getByRole('link', { name: 'Get test NVIDIA', exact: true }).click();
-  await expect(page).toHaveURL(/\/faucet#stock$/);
+  // The order card no longer links to the faucet; the navigation entry is the way back.
+  await page.getByRole('link', { name: 'Get test tokens', exact: true }).click();
+  await expect(page).toHaveURL(/\/faucet$/);
 });
 
 test('browser fetch reaches gateway directly; an unfunded offer never creates a position', async ({
@@ -158,16 +159,15 @@ test('static products and public estimates need no RPC or wallet, and quantity/e
     .getByRole('group', { name: 'Quantity unit' })
     .getByRole('button', { name: 'wNVDAx', exact: true })
     .click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('0.500000 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('0.50 USDG');
   await expect(page.getByTestId('reference-apr')).toHaveText('18.40%');
   await expect(offers.getByRole('button', { pressed: true })).toContainText('18.4% APR');
-  await expect(page.getByText(/Last valid market bid/)).toContainText('Sep 18');
   await page.getByLabel('Quantity', { exact: true }).fill('2');
-  await expect(page.getByTestId('reference-premium')).toHaveText('1.000000 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('1.00 USDG');
   await offers.locator('tbody tr').first().getByRole('button').nth(1).click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('1.000000 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('1.00 USDG');
   await page.getByRole('tab', { name: /Sell High/ }).click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('2.500000 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('2.50 USDG');
   await expect(offers.getByRole('button')).toHaveCount(10);
   expect(rpcCalls).toBe(0);
   expect(rfqCalls).toBe(0);
@@ -212,16 +212,16 @@ test('public estimates scale with raw wrapped units at a non-unit rate without a
   );
   await page.goto('/');
   await expect(page.getByTestId('wrapping-rate')).toContainText('1 wNVDAx = 1.003 NVDAx');
-  await expect(page.getByTestId('reference-premium')).toHaveText('0.498504 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('0.49 USDG');
   await page
     .getByRole('group', { name: 'Quantity unit' })
     .getByRole('button', { name: 'wNVDAx', exact: true })
     .click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('0.500000 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('0.50 USDG');
   await expect(page.locator('.order-selection')).toContainText('220.37');
   await expect(page.locator('.offer-table tr:has(button[aria-pressed="true"]) th')).toHaveText('220.37');
   await page.getByRole('tab', { name: /Sell High/ }).click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('1.250000 USDG');
+  await expect(page.getByTestId('reference-premium')).toHaveText('1.25 USDG');
   await expect(page.locator('.order-selection')).toContainText('225.38');
   expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
 });
