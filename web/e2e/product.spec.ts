@@ -13,8 +13,7 @@ async function quote(page: Page, side: 'Buy Low' | 'Sell High' = 'Buy Low') {
 }
 async function fill(page: Page) {
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('checkbox').check();
-  await dialog.getByRole('button', { name: 'Confirm demo trade' }).click();
+  await dialog.getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByText('Demo position created. ')).toBeVisible();
   await page.getByRole('link', { name: 'View portfolio' }).click();
 }
@@ -55,12 +54,11 @@ test('no quote, expired and cancelled confirmations never create a position', as
   await scenario(page, 'Expired quote');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   await expect(page.getByText('Quote expired', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Confirm demo trade' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Confirm', exact: true })).toHaveCount(0);
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await scenario(page, 'Cancel confirmation');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
-  await page.getByRole('dialog').getByRole('checkbox').check();
-  await page.getByRole('button', { name: 'Confirm demo trade' }).click();
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Simulated cancellation');
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('link', { name: 'Portfolio', exact: true }).click();
@@ -136,7 +134,6 @@ test('selecting the 14-day series uses its actual terms and premium', async ({ p
   await page.getByRole('button', { name: /14 days/ }).click();
   await expect(page.locator('.order-selection')).toHaveText('175.00 USDG · 14 days');
   await quote(page);
-  await expect(page.getByRole('dialog').locator('.receipt-list')).toContainText('Buy Low · 14 days');
   await expect(page.getByRole('dialog').locator('.premium-display strong')).toContainText('2.42');
 });
 

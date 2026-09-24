@@ -54,7 +54,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     [dialog, setDialog] = useState<'assets' | 'quote' | 'success' | null>(null);
   const [busy, setBusy] = useState(''),
     [message, setMessage] = useState(''),
-    [accepted, setAccepted] = useState(false),
     [completed, setCompleted] = useState<Position | null>(null);
   const [now, setNow] = useState(0),
     operation = useRef(0);
@@ -120,7 +119,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     operation.current++;
     setQuote(null);
     setDialog(null);
-    setAccepted(false);
     setMessage('');
     setBusy('');
   }, [
@@ -156,7 +154,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
         return;
       }
       setQuote(result);
-      setAccepted(false);
       setNow(Date.now());
       setDialog('quote');
     } catch (e) {
@@ -184,7 +181,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     }
   }
   async function fill() {
-    if (!adapter || !preview || !quote || !market || !accepted || remaining <= 0) return;
+    if (!adapter || !preview || !quote || !market || remaining <= 0) return;
     const op = ++operation.current;
     setBusy(config.mode === 'demo' ? 'Simulating position opening…' : 'Rechecking your quote…');
     setMessage('');
@@ -291,9 +288,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           <div className="asset-header">
             <div className="asset-identity">
               <TokenIcon symbol="NVDAx" size={40} />
-              <h2>
-                NVDAx <span>· NVIDIA</span>
-              </h2>
+              <h2>NVDAx</h2>
             </div>
           </div>
           <NvidiaPriceChart />
@@ -689,12 +684,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             </div>
             <div className="receipt-list">
               <div>
-                <span>Strategy</span>
-                <strong>
-                  {isPut ? 'Buy Low' : 'Sell High'} · {series?.days} days
-                </strong>
-              </div>
-              <div>
                 <span>Settlement amount</span>
                 <strong>{amount(terms.strikeAmountUSDG)} USDG</strong>
               </div>
@@ -710,18 +699,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                 <span>Protocol fee{quote ? ` (${quote.feeBps / 100}%)` : ''}</span>
                 <span>− {amount(terms.protocolFeeUSDG)} USDG</span>
               </div>
-              <div>
-                <span>Quoted by</span>
-                <span>{quote?.kind === 'demo' ? quote.dealerName : quote?.selection.dealerName}</span>
-              </div>
             </div>
-            <label className="consent">
-              <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-              <span>
-                I understand that assets are locked until exercise or expiry. Settlement transfers a fixed
-                quantity of wrapped stocks, together with their underlying rights.
-              </span>
-            </label>
             {message && (
               <div role="alert" className="notice error">
                 {message}
@@ -730,21 +708,16 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             {remaining > 0 ? (
               <button
                 className="button primary full"
-                disabled={!accepted || !!busy || pending || wrongNetwork || readOnly}
+                disabled={!!busy || pending || wrongNetwork || readOnly}
                 onClick={() => void fill()}
               >
-                {busy || (config.mode === 'demo' ? 'Confirm demo trade' : 'Confirm trade in wallet')}
+                {busy || 'Confirm'}
               </button>
             ) : (
               <button className="button primary full" disabled={!!busy} onClick={() => void inquire()}>
                 {busy || 'Get a new quote'}
               </button>
             )}
-            <p className="fine-print">
-              {config.mode === 'demo'
-                ? 'Quotes must pass execution checks before they expire. Demo actions do not create onchain positions.'
-                : 'Quotes must execute before expiry. Outside market hours, pricing can use the same option’s last valid market bid.'}
-            </p>
           </>
         )}
       </Modal>
