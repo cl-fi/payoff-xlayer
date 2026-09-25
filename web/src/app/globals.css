@@ -161,9 +161,6 @@ summary:focus-visible {
   width: 24px;
   height: auto;
 }
-.brand-period {
-  color: var(--pay);
-}
 .site-header nav {
   display: flex;
   gap: 28px;

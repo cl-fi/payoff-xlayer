@@ -37,9 +37,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="header-inner">
           <Link className="brand" href="/" aria-label="Payoff home">
             <Mark />
-            <span>
-              Payoff<span className="brand-period">.</span>
-            </span>
+            <span>Payoff</span>
           </Link>
           <nav aria-label="Main navigation">
             {[
