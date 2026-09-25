@@ -14,6 +14,8 @@ import { configSchema } from '../../src/config.mjs';
 import { SettlementChain } from '../../src/settlement-chain.mjs';
 import { SettlementMonitor } from '../../src/settlement.mjs';
 import { ManualSettlement } from '../../src/settlement-manual.mjs';
+import { AutoExercise, windowsOf } from '../../src/auto-exercise.mjs';
+import { parseAssetContext } from '../../src/hyperliquid.mjs';
 
 const require = createRequire(import.meta.url);
 test('manual settlement against real EVM contracts: all four outcomes, funding, pauses, recovery and duplicate guards', { timeout: 120000 }, async t => {
@@ -101,13 +103,35 @@ test('manual settlement against real EVM contracts: all four outcomes, funding, 
   }
   assert.equal(await balance(usd, user.address), beforeUsd + 220000000n);
   assert.equal(await balance(wrapped, user.address), beforeWrapped + 10n ** 18n);
+  // Automatic exercise in live mode through the same journal: at an oracle price of
+  // 210 the remaining 220 put (2) has intrinsic value and the remaining 220 call (4) has none.
+  let tick = 0;
+  const events = [];
+  const oracle = () => (210 + tick++ / 100).toFixed(2);
+  const runner = new AutoExercise({ config: { ...config, autoExercise: { ...config.autoExercise, enabled: true, dryRun: false, coins: { NVDA: 'xyz:NVDA' },
+    pollMs: 2000, oracleUnchangedPolls: 2, decideBeforeEndSeconds: 120, submitCutoffSeconds: 30 } },
+    chain, manual, path: join(dir, 'auto.json'), log: e => events.push(e), now: () => Date.now(),
+    price: { sample: async () => { const px = oracle(); return { ...parseAssetContext([{ universe: [{ name: 'xyz:NVDA' }] }, [{ oraclePx: px, midPx: px, markPx: px }]], 'xyz:NVDA'), observedAtMs: Date.now(), latencyMs: 1 }; } },
+    sleep: async ms => advance(BigInt(Math.ceil(Date.now() / 1000) + Math.ceil(ms / 1000))) });
+  await advance(end - 150n);
+  const [window] = windowsOf(await chain.snapshot(), Number(end - 150n));
+  assert.deepEqual(window.positions.map(p => p.id), ['2', '4']);
+  const record = await runner.runWindow(window);
+  assert.equal(record.outcome, 'completed');
+  assert.deepEqual(record.exercised.map(d => [d.positionId, d.side, d.dryRun]), [['2', 'put', undefined]]);
+  assert.match(record.exercised[0].hash, /^0x[0-9a-f]{64}$/);
+  assert.deepEqual(record.skipped.map(d => [d.positionId, d.reason]), [['4', 'NO_ADVANTAGE']]);
+  assert.equal((await chain.position(config.markets[0], '2')).state, 2);
+  assert.ok(events.some(e => e.event === 'auto_exercise_executed' && e.positionId === '2'));
+  assert.equal(JSON.parse(await readFile(join(dir, 'auto.json'), 'utf8')).windows[0].exercised[0].positionId, '2');
+  assert.equal((await manual.reconcile()).status, 'idle');
+  await write(wallets[2], 'SeriesVault', vault, 'claim', [2n]);
   await advance(end);
-  for (const id of [2, 4]) {
-    assert.ok((await manual.plan(action(id))).issues.includes('WINDOW_ENDED'));
-    await write(wallets[2], 'SeriesVault', vault, 'claim', [BigInt(id)]);
-  }
-  assert.equal(await balance(usd, user.address), beforeUsd + 440000000n);
-  assert.equal(await balance(wrapped, user.address), beforeWrapped + 2n * 10n ** 18n);
+  assert.ok((await manual.plan(action(4))).issues.includes('WINDOW_ENDED'));
+  await write(wallets[2], 'SeriesVault', vault, 'claim', [4n]);
+  // Call 3 paid USDG; puts 1 and 2 delivered wrapped stock; call 4 expired and returned its wrapped collateral.
+  assert.equal(await balance(usd, user.address), beforeUsd + 220000000n);
+  assert.equal(await balance(wrapped, user.address), beforeWrapped + 3n * 10n ** 18n);
   const restarted = new SettlementMonitor({ config, chain, path: join(dir, 'monitor.json') });
   await restarted.start(); await restarted.stop();
   assert.ok(restarted.snapshot.markets[0].positions.every(p => p.state === 'claimed'));

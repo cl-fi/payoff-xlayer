@@ -15,7 +15,7 @@ const requestSchema = z.strictObject({
   // The dealer obtains authoritative terms from the chain, never trusts the supplied snapshot.
   snapshot: z.object({}).passthrough(), collectUntil: z.iso.datetime(),
 });
-export async function buildDealerApp({ config, chain, provider, account, token, reference, settlement, logger = false }) {
+export async function buildDealerApp({ config, chain, provider, account, token, reference, settlement, autoExercise, logger = false }) {
   const app = Fastify({ logger: logger ? { level: 'info', redact: ['req.headers.authorization'] } : false, bodyLimit: 16384 });
   const credential = Buffer.from(`Bearer ${token}`);
   let active = 0;
@@ -26,7 +26,7 @@ export async function buildDealerApp({ config, chain, provider, account, token, 
     const supplied = Buffer.from(req.headers.authorization ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return reply.code(401).send({ error: 'UNAUTHORIZED' });
     const status = settlement?.status() ?? { status: 'unavailable', automaticExercise: false, snapshot: null };
-    return reply.code(status.status === 'ready' ? 200 : 503).send(status);
+    return reply.code(status.status === 'ready' ? 200 : 503).send({ ...status, autoExercise: autoExercise?.status() ?? { enabled: false, phase: 'disabled' } });
   });
   app.get('/reference-quotes', async (req, reply) => {
     const supplied = Buffer.from(req.headers.authorization ?? '');

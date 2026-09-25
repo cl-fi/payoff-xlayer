@@ -79,6 +79,7 @@ services:
       DEALER_BID_CACHE_PATH: /var/lib/payoff-dealer/last-valid-bids.json
       DEALER_SETTLEMENT_PATH: /var/lib/payoff-dealer/settlement.json
       DEALER_SETTLEMENT_TX_PATH: /var/lib/payoff-dealer/settlement-transactions.json
+      DEALER_AUTO_EXERCISE_PATH: /var/lib/payoff-dealer/auto-exercise.json
       XLAYER_RPC_URL: ${XLAYER_RPC_URL:?Set the deployed chain RPC}
       SELF_DEALER_API_TOKEN: ${SELF_DEALER_API_TOKEN:?Set the shared dealer token}
     volumes:

@@ -101,7 +101,7 @@ Foundry is pinned through npm; no global installation is needed. Contracts use S
 - Contract tests cover both strategies, quote validation, lifecycle transitions, fuzz cases and multi-market accounting invariants.
 - SDK checks compare a committed EIP-712 vector with Solidity and exercise integer rounding and wrapped-asset conversions.
 - Gateway tests cover dealer transport, selection, persistent idempotency and receipt verification. Local EVM integration deploys the actual Exchange and Vault with test assets on Anvil. Database tests use PGlite locally unless `TEST_DATABASE_URL` is set; CI uses PostgreSQL 17.
-- Dealer settlement tests cover manual exercise, inventory/allowance checks, transaction recovery and all four claim outcomes. The VPS runs a read-only monitor; see [manual settlement operations](dealer/SETTLEMENT.md).
+- Dealer settlement tests cover manual exercise, inventory/allowance checks, transaction recovery, all four claim outcomes and the automatic exercise rule. The VPS runs a read-only monitor by default; an opt-in automatic mode exercises on the Hyperliquid NVDA perpetual oracle price near the end of each window. See [settlement operations](dealer/SETTLEMENT.md) and the [automatic exercise design](dealer/AUTO-EXERCISE.md).
 - Frontend tests cover both strategies and settlement outcomes, quote expiry, account changes, demo isolation, and desktop/mobile layouts. See the [frontend guide](web/README.md#verification) for browser prerequisites.
 
 Optional checks requiring an X Layer RPC:
@@ -119,7 +119,7 @@ The [frontend guide](web/README.md) covers Vercel. The [gateway guide](gateway/R
 
 The [testnet deployment guide](script/README.md) covers chain 1952, encrypted-keystore signing, sample series, and test stock/wrapper assets. Gateway-mode product browsing uses a verified static [catalog](web/public/catalog.json), generated with `npm run catalog:generate` and deployed with the frontend. Public reference premiums come directly from the VPS; wallet data and selected-trade checks read the chain independently. The test stock and wrapper are not issuer-backed assets. Contract addresses and discovery IDs are public; operational notes and credentials remain excluded.
 
-The self-operated dealer now supports live ThetaData option snapshots and a simple 50%-of-bid pricing rule, with a shared VPS deployment for the gateway and dealer. The frontend is connected to the gateway. Hedging, automatic dealer exercise, future-series scheduling, public test-asset distribution, a scalable server-side position index and mainnet deployment remain separate work. Demo prices, premiums and fees are test data. Contracts have no proxy upgrade path, administrator withdrawal, price oracle or corporate-action cash adjustment. This is an MVP implementation, not an audited production release.
+The self-operated dealer now supports live ThetaData option snapshots and a simple 50%-of-bid pricing rule, with a shared VPS deployment for the gateway and dealer. The frontend is connected to the gateway. Automatic dealer exercise exists as an opt-in, dry-run-first dealer mode. Hedging, future-series scheduling, public test-asset distribution, a scalable server-side position index and mainnet deployment remain separate work. Demo prices, premiums and fees are test data. Contracts have no proxy upgrade path, administrator withdrawal, price oracle or corporate-action cash adjustment. This is an MVP implementation, not an audited production release.
 
 ### Current X Layer testnet assets
 

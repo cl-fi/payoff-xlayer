@@ -52,5 +52,16 @@
   "maxQuoteAgeSeconds": 30,
   "catalogUrl": "https://www.payoff.finance/catalog.json",
   "catalogRefreshMs": 300000,
-  "referenceIntervalMs": 30000
+  "referenceIntervalMs": 30000,
+  "autoExercise": {
+    "enabled": false,
+    "dryRun": true,
+    "coins": {
+      "NVDA": "xyz:NVDA"
+    },
+    "minEdgeBps": 0,
+    "decideBeforeEndSeconds": 300,
+    "submitCutoffSeconds": 60,
+    "skipDates": []
+  }
 }

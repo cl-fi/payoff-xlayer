@@ -36,3 +36,6 @@ docs/
 
 # Local Vercel project binding and downloaded environment files.
 .vercel/
+
+# Pitch deck and recording script, kept out of the public repo.
+pitch/

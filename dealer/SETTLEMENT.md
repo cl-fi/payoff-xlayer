@@ -1,9 +1,11 @@
-# Manual settlement operations
+# Settlement operations
 
-Settlement is **manual by product choice**. The background monitor never signs,
+Settlement is **manual by default**. The background monitor never signs,
 approves, funds or exercises. It does not use the 50%-option-bid quote policy to
 decide whether a position should exercise. An operator chooses each position.
 No stock-price subscription or new on-chain oracle is required by this mode.
+An opt-in automatic mode (below) exercises on the Hyperliquid NVDA perpetual
+oracle price near the end of each window; see `AUTO-EXERCISE.md` for the design.
 
 ## Monitor
 
@@ -38,6 +40,60 @@ The existing persistent dealer volume stores:
 only checks the premium budget and Exchange allowance; it cannot prove delivery
 is funded or authorized to the Vault.
 
+## Automatic exercise
+
+`autoExercise` in the dealer configuration turns the rule on. Absent, or with
+`enabled: false`, nothing changes. With `dryRun: true` (the default) the runner
+evaluates and logs every decision but signs nothing; `dryRun: false` executes.
+
+```json
+"autoExercise": { "enabled": true, "dryRun": true, "coins": { "NVDA": "xyz:NVDA" } }
+```
+
+The runner lives inside the self-dealer process and uses the same transaction
+journal and PID lock as the CLI, so an operator command and the runner can never
+sign concurrently. It reads the `oraclePx` of the configured Hyperliquid
+perpetual (`POST /info`, `metaAndAssetCtxs`, dex `xyz`) and, for each open
+position in the window, computes the long side's intrinsic value at that price:
+
+```text
+shares    = wrappedQuantity × convertToAssets(1e18) / 1e18   (rate read at decision time)
+notional  = shares × oraclePx                                 (USDG micros)
+put       = strikeAmountUSDG − notional
+call      = notional − strikeAmountUSDG
+exercise  ⇔ intrinsic > 0 and intrinsic / notional ≥ minEdgeBps (default 0)
+```
+
+Timing per window `[exerciseStart, exerciseEnd)`: sampling starts shortly before
+`exerciseEnd − decideBeforeEndSeconds` (default 5 minutes), decisions repeat every
+`pollMs` (10 s) until `exerciseEnd − submitCutoffSeconds` (60 s), most valuable
+position first, one transaction at a time with two confirmations. A pending or
+uncertain broadcast is reconciled before anything else is sent; an unresolved
+previous transaction halts the window. Positions still open at the cutoff expire.
+
+Guards that skip a poll: oracle more than `oracleMidBandBps` (100) away from the
+book mid, oracle unchanged for `oracleUnchangedPolls` (6) consecutive polls,
+empty book, fetch failure. Windows on Saturday, Sunday or a date in `skipDates`
+(early-close sessions) are refused outright. Only the Hyperliquid oracle is used;
+ThetaData is not consulted.
+
+Operations:
+
+- `settlement-cli.mjs evaluate` prints the live oracle price and the would-be
+  decision for every open position without signing.
+- `GET /settlement` includes `autoExercise` (phase, next window, last window).
+- Log events: `auto_exercise_armed`, `auto_exercise_poll`, `auto_exercise_dry_run`,
+  `auto_exercise_executed`, `auto_exercise_window`; alerts carry an `alert` code
+  (`AUTO_EXERCISE_BLOCKED`, `AUTO_EXERCISE_HALTED`, `AUTO_EXERCISE_REVERTED`,
+  `MARKET_CLOSED_IN_WINDOW`, `NO_PRICE_SOURCE`, `PRICE_UNAVAILABLE`).
+- `DEALER_AUTO_EXERCISE_PATH=/var/lib/payoff-dealer/auto-exercise.json` keeps
+  the last 30 window records (decisions, prices, hashes, skip reasons).
+
+Exercise windows are absolute timestamps set at series creation. Generate them
+in `America/New_York` (daylight saving changes the UTC offset) and avoid
+half-day sessions, when both the perpetual oracle and the stock market are
+outside regular hours by 15:30 ET.
+
 ## Commands on the existing VPS
 
 Run from `/opt/payoff/app` through AWS SSM. No public administration port is added.
@@ -51,6 +107,8 @@ Replace `status` with the commands below. Copy the exact Vault address and
 position ID from the fresh status snapshot.
 
 ```text
+evaluate
+
 exercise --vault VAULT_ADDRESS --position POSITION_ID
 exercise --vault VAULT_ADDRESS --position POSITION_ID --execute
 
@@ -105,7 +163,10 @@ npm run test:integration --workspace @payoff/self-dealer
 ```
 
 Tests cover warning transitions, shared inventory reporting, stale/error status,
-private read-only access and recovery from ambiguous broadcasts. Local EVM tests
+private read-only access, recovery from ambiguous broadcasts, and the automatic
+rule (price parsing and guards, put/call intrinsic at a drifted wrapper rate,
+dry-run signing nothing, edge ordering, pending reconciliation, halts, cutoff,
+weekend refusal, daemon scheduling). Local EVM tests
 open four actual positions, prove monitoring sends nothing, execute manual Put/Call
 exercise and approval, claim all four outcomes, check duplicate/ownership/window
 guards and settle positions after trading admission is removed.

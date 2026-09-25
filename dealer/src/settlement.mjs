@@ -11,6 +11,9 @@ export async function savePrivate(path, value) {
   try { await directory.sync(); } finally { await directory.close(); }
 }
 
+export const exerciseMode = config => !config.autoExercise?.enabled ? 'manual' : config.autoExercise.dryRun ? 'automatic_dry_run' : 'automatic';
+export const automaticExercise = config => exerciseMode(config) === 'automatic';
+
 export function settlementStatus(snapshot, config) {
   const now = BigInt(snapshot.blockTimestamp), alerts = [], markets = [];
   const alert = (code, details = {}) => alerts.push({ code, ...details });
@@ -43,7 +46,7 @@ export function settlementStatus(snapshot, config) {
   // reservation. All Vaults share the same dealer USDG balance.
   const usdgBalance = snapshot.markets[0]?.usdgBalance ?? '0';
   if (BigInt(usdgBalance) < totalCallUSDG) alert('USDG_DELIVERY_SHORTFALL', { required: String(totalCallUSDG), available: usdgBalance });
-  return { ...snapshot, mode: 'manual', automaticExercise: false, requiredUSDG: String(totalCallUSDG), markets, alerts };
+  return { ...snapshot, mode: exerciseMode(config), automaticExercise: automaticExercise(config), requiredUSDG: String(totalCallUSDG), markets, alerts };
 }
 
 export class SettlementMonitor {
@@ -64,14 +67,14 @@ export class SettlementMonitor {
     this.snapshot = snapshot; this.lastError = null;
     const key = JSON.stringify(snapshot.alerts);
     if (key !== this.alertKey || Date.now() - (this.lastAlertMs ?? 0) >= 900000) {
-      this.log({ event: 'settlement_status', mode: 'manual', blockNumber: snapshot.blockNumber, alerts: snapshot.alerts,
+      this.log({ event: 'settlement_status', mode: exerciseMode(this.config), blockNumber: snapshot.blockNumber, alerts: snapshot.alerts,
         positions: snapshot.markets.flatMap(m => m.positions).length });
       this.alertKey = key; this.lastAlertMs = Date.now();
     }
   }
   status() {
     const stale = !this.snapshot || Date.now() - this.snapshot.observedAtMs > this.config.settlementIntervalMs * 2 + 10000;
-    return { status: this.lastError || stale ? 'unavailable' : 'ready', automaticExercise: false,
+    return { status: this.lastError || stale ? 'unavailable' : 'ready', automaticExercise: automaticExercise(this.config),
       lastError: this.lastError, snapshot: this.snapshot };
   }
   async start() {
