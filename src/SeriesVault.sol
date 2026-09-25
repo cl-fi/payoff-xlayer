@@ -30,6 +30,8 @@ contract SeriesVault is PositionReceipts, ReentrancyGuard {
     bool public newPositionsPaused;
     mapping(uint256 => T.Series) private _series;
     mapping(uint256 => T.Position) private _positions;
+    // Short-side history per holder so wallets can list positions without scanning event logs.
+    mapping(address => uint256[]) private _positionsOf;
 
     error Unauthorized();
     error InvalidConfiguration();
@@ -125,8 +127,17 @@ contract SeriesVault is PositionReceipts, ReentrancyGuard {
         uint256 amount = PayoffMath.strikeAmount(p.wrappedQuantity, terms.strikePricePerWrappedUSDG);
         if (amount != p.strikeAmountUSDG) revert StrikeAmountMismatch();
         id = nextPositionId++;
-        _positions[id] =
-            T.Position(p.seriesId, p.shortHolder, p.longHolder, p.wrappedQuantity, amount, 0, T.State.Open);
+        _positions[id] = T.Position(
+            p.seriesId,
+            p.shortHolder,
+            p.longHolder,
+            p.wrappedQuantity,
+            amount,
+            0,
+            T.State.Open,
+            uint64(block.timestamp)
+        );
+        _positionsOf[p.shortHolder].push(id);
         if (terms.side == T.Side.Put) {
             if (amount > p.maxCollateralUSDG) revert CollateralLimitExceeded();
             accountedUSDG += amount;
@@ -209,6 +220,27 @@ contract SeriesVault is PositionReceipts, ReentrancyGuard {
 
     function position(uint256 id) external view returns (T.Position memory) {
         return _position(id);
+    }
+
+    /// @notice Number of positions `holder` opened as the short side, including settled ones.
+    function positionCountOf(address holder) external view returns (uint256) {
+        return _positionsOf[holder].length;
+    }
+
+    /// @notice Short-side position IDs of `holder` in opening order; an offset past the end is empty.
+    function positionIdsOf(address holder, uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory ids)
+    {
+        uint256[] storage all = _positionsOf[holder];
+        uint256 end = all.length;
+        if (offset >= end) return ids;
+        if (limit < end - offset) end = offset + limit;
+        ids = new uint256[](end - offset);
+        for (uint256 i = offset; i < end; ++i) {
+            ids[i - offset] = all[i];
+        }
     }
 
     function stateOf(uint256 id) external view returns (T.State) {

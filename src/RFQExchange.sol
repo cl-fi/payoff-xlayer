@@ -26,6 +26,8 @@ contract RFQExchange is EIP712, ReentrancyGuard {
     mapping(address => address) public vaultForStock;
     mapping(address => bool) public dealerAllowed;
     mapping(address => mapping(uint256 => bool)) public nonceUnavailable;
+    // Net premium paid to the short side, keyed by Vault and position, readable without event logs.
+    mapping(address => mapping(uint256 => uint256)) public netPremiumOf;
     error Unauthorized();
     error InvalidConfiguration();
     error VaultNotAllowed();
@@ -165,6 +167,7 @@ contract RFQExchange is EIP712, ReentrancyGuard {
             quote.requestId
         );
         positionId = ISeriesVault(quote.vault).openPosition(params);
+        netPremiumOf[quote.vault][positionId] = quote.netPremiumUSDG;
         usdg.pull(quote.dealer, quote.taker, quote.netPremiumUSDG);
         usdg.pull(quote.dealer, feeRecipient, quote.protocolFeeUSDG);
         _emitFill(quote, positionId, digest);

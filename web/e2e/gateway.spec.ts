@@ -80,8 +80,8 @@ test('confirmed quote shows its checked fee and a later fee update clears it', a
       });
       if (functionName === 'feeBps')
         result = encodeFunctionResult({ abi: exchangeAbi, functionName, result: checkedFee });
-      if (functionName === 'nextPositionId')
-        result = encodeFunctionResult({ abi: vaultAbi, functionName, result: 1n });
+      if (functionName === 'positionIdsOf')
+        result = encodeFunctionResult({ abi: vaultAbi, functionName, result: [] });
       if (functionName === 'allowance')
         result = encodeFunctionResult({ abi: tokenAbi, functionName, result: 10000000n });
     }
@@ -131,8 +131,8 @@ test('test-token page validates amounts and asks the wallet to mint the selected
           functionName: 'symbol',
           result: request.params[0].to.toLowerCase() === deployment.stock.toLowerCase() ? 'tNVDAx' : 'tUSDG',
         });
-      if (decoded.functionName === 'nextPositionId')
-        result = encodeFunctionResult({ abi: vaultAbi, functionName: 'nextPositionId', result: 1n });
+      if (decoded.functionName === 'positionIdsOf')
+        result = encodeFunctionResult({ abi: vaultAbi, functionName: 'positionIdsOf', result: [] });
     }
     await route.fulfill({ json: { jsonrpc: '2.0', id: request.id, result: result ?? fixtureRpc(request) } });
   });
@@ -206,8 +206,8 @@ test('browser fetch reaches gateway directly; an unfunded offer never creates a 
         abi: [...vaultAbi, ...tokenAbi, ...wrapperAbi, ...exchangeAbi],
         data: request.params[0].data,
       });
-      if (functionName === 'nextPositionId')
-        result = encodeFunctionResult({ abi: vaultAbi, functionName, result: 1n });
+      if (functionName === 'positionIdsOf')
+        result = encodeFunctionResult({ abi: vaultAbi, functionName, result: [] });
       if (functionName === 'allowance')
         result = encodeFunctionResult({ abi: tokenAbi, functionName, result: 10000000n });
     }

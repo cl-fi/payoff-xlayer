@@ -348,6 +348,47 @@ contract SeriesVaultTest is Test {
         vault.claim(0);
     }
 
+    function testIndexesShortHolderPositionsInOpeningOrder() public {
+        assertEq(vault.positionCountOf(user), 0);
+        assertEq(vault.positionIdsOf(user, 0, 10).length, 0);
+        uint256 first = _open();
+        vm.warp(1500);
+        uint256 second = _open();
+        assertEq(vault.positionCountOf(user), 2);
+        uint256[] memory ids = vault.positionIdsOf(user, 0, 10);
+        assertEq(ids.length, 2);
+        assertEq(ids[0], first);
+        assertEq(ids[1], second);
+        assertEq(vault.position(first).openedAt, 1000);
+        assertEq(vault.position(second).openedAt, 1500);
+        // Only the short side is indexed; the long dealer and outsiders see nothing.
+        assertEq(vault.positionCountOf(dealer), 0);
+        assertEq(vault.positionCountOf(stranger), 0);
+        assertEq(vault.positionIdsOf(dealer, 0, 10).length, 0);
+    }
+
+    function testPositionIndexPaginatesAndSurvivesSettlement() public {
+        uint256 first = _open();
+        uint256 second = _open();
+        uint256 third = _open();
+        uint256[] memory page = vault.positionIdsOf(user, 1, 1);
+        assertEq(page.length, 1);
+        assertEq(page[0], second);
+        page = vault.positionIdsOf(user, 2, 5);
+        assertEq(page.length, 1);
+        assertEq(page[0], third);
+        assertEq(vault.positionIdsOf(user, 3, 5).length, 0);
+        assertEq(vault.positionIdsOf(user, 50, 5).length, 0);
+        assertEq(vault.positionIdsOf(user, 0, 0).length, 0);
+        vm.warp(3000);
+        _exercise(first);
+        _claim(first);
+        assertEq(uint8(vault.stateOf(first)), uint8(T.State.Claimed));
+        // Settled and claimed positions remain listed as history.
+        assertEq(vault.positionCountOf(user), 3);
+        assertEq(vault.positionIdsOf(user, 0, 10)[0], first);
+    }
+
     function testFuzzPutLifecycleConservesAssets(uint96 rawQuantity, uint96 rawMultiplier) public {
         uint256 quantity = bound(uint256(rawQuantity), 1e12, 10e18);
         uint256 multiplier = bound(uint256(rawMultiplier), 0.01e18, 100e18);

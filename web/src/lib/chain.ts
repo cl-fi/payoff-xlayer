@@ -39,7 +39,9 @@ export const vaultAbi = parseAbi([
   'function usdg() view returns(address)',
   'function exchange() view returns(address)',
   'function getSeries(uint256) view returns((uint8 side,uint256 strikePricePerWrappedUSDG,uint64 tradeCutoff,uint64 exerciseStart,uint64 exerciseEnd))',
-  'function position(uint256) view returns((uint256 seriesId,address shortHolder,address longHolder,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 wrappedBalance,uint8 state))',
+  'function position(uint256) view returns((uint256 seriesId,address shortHolder,address longHolder,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 wrappedBalance,uint8 state,uint64 openedAt))',
+  'function positionCountOf(address) view returns(uint256)',
+  'function positionIdsOf(address holder,uint256 offset,uint256 limit) view returns(uint256[])',
   'function claim(uint256)',
   'function nextPositionId() view returns(uint256)',
   'function stateOf(uint256) view returns(uint8)',
@@ -51,8 +53,11 @@ export const exchangeAbi = parseAbi([
   'function feeBps() view returns(uint16)',
   'function usdg() view returns(address)',
   'function vaultAllowed(address) view returns(bool)',
+  'function netPremiumOf(address vault,uint256 positionId) view returns(uint256)',
   'function fill((bytes32 requestId,address vault,address dealer,address taker,uint256 seriesId,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 grossPremiumUSDG,uint256 protocolFeeUSDG,uint256 netPremiumUSDG,uint64 issuedAt,uint64 deadline,uint256 nonce) quote,bytes signature,(uint256 minNetPremiumUSDG,uint256 maxCollateralUSDG,uint256 maxCollateralWrapped) limits) returns(uint256)',
 ]);
+/** Canonical Multicall3 deployment; the same address is deployed on X Layer Testnet. */
+export const MULTICALL3: Address = '0xcA11bde05977b3631167028862bE2a173976CA11';
 export function chainConfig(config: Config) {
   return defineChain({
     id: config.chainId,
@@ -60,6 +65,7 @@ export function chainConfig(config: Config) {
     nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
     rpcUrls: { default: { http: [config.rpcUrl] } },
     blockExplorers: { default: { name: 'OKX Explorer', url: config.explorerUrl } },
+    contracts: { multicall3: { address: MULTICALL3 } },
     testnet: true,
   });
 }

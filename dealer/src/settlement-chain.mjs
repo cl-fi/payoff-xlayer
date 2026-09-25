@@ -5,7 +5,7 @@ export const settlementVaultAbi = parseAbi([
   'function exchange() view returns (address)', 'function usdg() view returns (address)',
   'function stock() view returns (address)', 'function wrappedStock() view returns (address)',
   'function RULES_VERSION() view returns (uint256)', 'function nextPositionId() view returns (uint256)',
-  'function position(uint256) view returns ((uint256 seriesId,address shortHolder,address longHolder,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 wrappedBalance,uint8 state))',
+  'function position(uint256) view returns ((uint256 seriesId,address shortHolder,address longHolder,uint256 wrappedQuantity,uint256 strikeAmountUSDG,uint256 wrappedBalance,uint8 state,uint64 openedAt))',
   'function getSeries(uint256) view returns ((uint8 side,uint256 strikePricePerWrappedUSDG,uint64 tradeCutoff,uint64 exerciseStart,uint64 exerciseEnd))',
   'function exercise(uint256)',
 ]);

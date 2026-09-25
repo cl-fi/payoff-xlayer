@@ -1,9 +1,9 @@
 {
   "chainId": 1952,
-  "vault": "0xE51bD7994DcBA4aB9eD0fAe00d2c8dd26c14b5bd",
-  "rateSnapshotBlock": "41762970",
+  "vault": "0x0d90A6561D8F9399dB6Bb9E8CafbB43269a6f90d",
+  "rateSnapshotBlock": "41854437",
   "assetsPerWrapped": "1001701196801074000",
-  "verifiedAtBlock": "41763261",
+  "verifiedAtBlock": "41854683",
   "publishedSeries": [
     {
       "stockTargetPriceUSDG": "220000000",
@@ -13,10 +13,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "1",
-      "transactionHash": "0x51851d3b9eaf0e866b5efbe364881b2c360816affda4a4a14d8f4882609c328d",
-      "blockNumber": "41763176",
-      "gasUsed": "77540",
-      "feeWei": "1550800077540"
+      "transactionHash": "0x0cde2cb0ac0896c2d057b615a206f3d25d1bb3a0a16f6461bf2506b1c04e854f",
+      "blockNumber": "41854555",
+      "gasUsed": "77607",
+      "feeWei": "1552140077607"
     },
     {
       "stockTargetPriceUSDG": "215000000",
@@ -26,10 +26,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "2",
-      "transactionHash": "0x56ccdff74a2691404a00241fc76a4e6d856d796184a59622a34bc93c6df59763",
-      "blockNumber": "41763180",
-      "gasUsed": "77540",
-      "feeWei": "1550800077540"
+      "transactionHash": "0x70bb740de481aa40e44a4fbf60e956eb5d76117802906a6c34b7dbae8b6fb622",
+      "blockNumber": "41854560",
+      "gasUsed": "77607",
+      "feeWei": "1552140077607"
     },
     {
       "stockTargetPriceUSDG": "210000000",
@@ -39,10 +39,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "3",
-      "transactionHash": "0xec5ccfac258bcf30586b9682c56b43149ae83feac19e84037a6be7f78126f09d",
-      "blockNumber": "41763183",
-      "gasUsed": "77540",
-      "feeWei": "1550800077540"
+      "transactionHash": "0x1096bd743fa4008dca61f8b3bd1078c314927a992b6ec0e98f24ca50e95d9406",
+      "blockNumber": "41854563",
+      "gasUsed": "77607",
+      "feeWei": "1552140077607"
     },
     {
       "stockTargetPriceUSDG": "225000000",
@@ -52,10 +52,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "4",
-      "transactionHash": "0x52383c423ae773a685f29bf4b1d028ad5cf972b24ffad5cad40aade005128088",
-      "blockNumber": "41763188",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0xb7f104651a2c47e3749d6a5688467e8eb782d36444cc29d710247fb476459b82",
+      "blockNumber": "41854568",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "230000000",
@@ -65,10 +65,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "5",
-      "transactionHash": "0x1b171d91a4035cd27fd8bb195998eadb991304ffd8d26df36a261a77f8e1a2fb",
-      "blockNumber": "41763198",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0xea97d75d316d043d395355afe296c04c8e24c504a45b837271fb907d20d45996",
+      "blockNumber": "41854571",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "235000000",
@@ -78,10 +78,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "6",
-      "transactionHash": "0xad4b5b741a60b49a39dfda9d9452589793b5cc7bf42f8faadd1c87a12c07e3c1",
-      "blockNumber": "41763205",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0x227009521478b94c6822bf43bb29c53a2dbd63233280e9636f469bca76f11418",
+      "blockNumber": "41854575",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "240000000",
@@ -91,10 +91,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "7",
-      "transactionHash": "0x2f5b18347eeda387e771553bdbce5021107fbabde76369494be9f2bd26191153",
-      "blockNumber": "41763209",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0x8b1193c2b225d4f4f9040ed16c624ec469d14f9002fc25607f9ee59bb11e6184",
+      "blockNumber": "41854578",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "245000000",
@@ -104,10 +104,10 @@
       "exerciseStart": "1790364600",
       "exerciseEnd": "1790366400",
       "id": "8",
-      "transactionHash": "0x96b6567540c16fbe64db11a6a4602bc562d94fb5f688d77a10cd2f1c2d0322a3",
-      "blockNumber": "41763213",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0x90f63e487f53f6a9423ad50389c1980b1a81d492375bd6fd0a661d04fac59f97",
+      "blockNumber": "41854582",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "220000000",
@@ -117,10 +117,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "9",
-      "transactionHash": "0xcd748cc923f566278964d5adfada870e0211da6b602f228e0e7efe88ec0aab7c",
-      "blockNumber": "41763218",
-      "gasUsed": "77540",
-      "feeWei": "1550800077540"
+      "transactionHash": "0x3b6894e4164c4f6fb83868d9a2740c6f64f49f343202e24f80f57ac6ed8079e8",
+      "blockNumber": "41854587",
+      "gasUsed": "77607",
+      "feeWei": "1552140077607"
     },
     {
       "stockTargetPriceUSDG": "215000000",
@@ -130,10 +130,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "10",
-      "transactionHash": "0x9e17b5cb4e5a7b595ae68eb3c2a0c8eb8bf2c6b9624abd4be2c3c32e08bf551b",
-      "blockNumber": "41763223",
-      "gasUsed": "77540",
-      "feeWei": "1550800077540"
+      "transactionHash": "0x22e1a691bc8b576dc9eeede06796b7685c9fcd65a4c5695120cd05272017fbc5",
+      "blockNumber": "41854590",
+      "gasUsed": "77607",
+      "feeWei": "1552140077607"
     },
     {
       "stockTargetPriceUSDG": "210000000",
@@ -143,10 +143,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "11",
-      "transactionHash": "0x3d68431daec8a128bbef7035ea4f3485176aef3fd76bcd28606feeee1889b01b",
-      "blockNumber": "41763227",
-      "gasUsed": "77540",
-      "feeWei": "1550800077540"
+      "transactionHash": "0x6265ddaee6bac598aeecfc0ca9dfc6ee925addf8e62e77e276a40aca6ec3926b",
+      "blockNumber": "41854593",
+      "gasUsed": "77607",
+      "feeWei": "1552140077607"
     },
     {
       "stockTargetPriceUSDG": "225000000",
@@ -156,10 +156,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "12",
-      "transactionHash": "0xf748b74787f99726894047c6941f6e4a781a4cc683a0633c41f2c6860f40bb87",
-      "blockNumber": "41763233",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0x5c0490dee88ce68d79d3b01b39fd520980893a9b41d04456cfd4b22f624eb02e",
+      "blockNumber": "41854596",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "230000000",
@@ -169,10 +169,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "13",
-      "transactionHash": "0xf5953be040f2ee6779e641e42ff2f50f1e29c3736c35008823d8f5f7cbc983a9",
-      "blockNumber": "41763236",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0xae50cb41981fb87221828a00e280ae5f4492d23ec33d19fd21f8f64260f9977f",
+      "blockNumber": "41854600",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "235000000",
@@ -182,10 +182,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "14",
-      "transactionHash": "0xcf7e2ebb8c186c969bc47f0a6409d945e85ba37d1da39501b67a40857224fbee",
-      "blockNumber": "41763240",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0xa67ddff7c9b867da75a337a772437d94c3126b0160e6a560ba5e3916fccaf8aa",
+      "blockNumber": "41854605",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "240000000",
@@ -195,10 +195,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "15",
-      "transactionHash": "0x6c18ee55bb3b983c1d4e0f678291bb9a63870365fb68a5b0816991eb17674fc6",
-      "blockNumber": "41763243",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0xc58f6f82985bb878363034e3272ae43fd0dd972fa4ff461e35f3ab7410c45293",
+      "blockNumber": "41854609",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     },
     {
       "stockTargetPriceUSDG": "245000000",
@@ -208,10 +208,10 @@
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200",
       "id": "16",
-      "transactionHash": "0xe3b08d3c5152a0ceacff5700f21a81d6326e59d34da8176a3164b3be4add1fd3",
-      "blockNumber": "41763247",
-      "gasUsed": "97452",
-      "feeWei": "1949040097452"
+      "transactionHash": "0xccaa58698cb8f72039181a7ebf0d9d65d437920f3e19463ec3924c7c2a8eed0b",
+      "blockNumber": "41854612",
+      "gasUsed": "97519",
+      "feeWei": "1950380097519"
     }
   ],
   "policy": "new-test-settlement-domain; old-test-positions-not-migrated"

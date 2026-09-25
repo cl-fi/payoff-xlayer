@@ -33,6 +33,8 @@ library PayoffTypes {
         // Wrapped ERC-20 units still owed to this position, not underlying xStock shares.
         uint256 wrappedBalance;
         State state;
+        // Opening block time; shares the state slot so it adds no storage write.
+        uint64 openedAt;
     }
 
     struct OpenParams {

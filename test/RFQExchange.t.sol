@@ -40,6 +40,8 @@ contract RFQExchangeTest is SystemFixture {
         assertEq(usd.balanceOf(feeRecipient), 0.02e6);
         assertEq(vaultA.accountedUSDG(), 180e6);
         assertTrue(exchange.nonceUnavailable(dealer, 7));
+        assertEq(exchange.netPremiumOf(address(vaultA), id), 1_980_000);
+        assertEq(exchange.netPremiumOf(address(vaultB), id), 0);
     }
 
     function testNonceCannotReplayAcrossVaults() public {

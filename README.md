@@ -48,7 +48,7 @@ Browser / Next.js frontend
                               └── SeriesVault: stock B → series → positions
 ```
 
-The browser sends wallet transactions directly to the deployed contracts. Pending transaction hashes are kept locally; positions are recovered from chain events and Vault state.
+The browser sends wallet transactions directly to the deployed contracts. Pending transaction hashes are kept locally; positions are read from the Vault's onchain holder index and the Exchange's premium record, so no event-log scan is needed.
 
 - **One shared RFQExchange** verifies EIP-712 v2 or ERC-1271 signatures, dealer and Vault admission, fees, deadlines, nonces, and user execution limits. Quotes bind the user, Vault and series.
 - **One SeriesVault per stock** holds collateral and records series and positions. Exercise and claims go directly to that Vault. Trades only inspect their selected market; there is no cross-stock aggregate collateral cap.

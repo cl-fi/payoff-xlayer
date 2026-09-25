@@ -1,15 +1,15 @@
 {
   "chainId": 1952,
-  "deploymentBlock": "41763162",
+  "deploymentBlock": "41854539",
   "rpcUrl": "https://testrpc.xlayer.tech/terigon",
   "explorerUrl": "https://www.okx.com/web3/explorer/xlayer-test",
-  "exchange": "0xC85457ADDb2be9cF87532FF8e8e149d162d2Da6B",
+  "exchange": "0x8D59286d1b728599bA897436cC6C3Ce1a8DB6D6a",
   "usdg": "0x56C62A3d7b0B7F0fC32F88635B4Ab140C02B3B53",
   "stock": "0x1DDa57B38E0461a29c0281497c15fb77657450Eb",
   "wrappedStock": "0x691fFBCd11f0bA0B58D387B9f2649F6393b71E57",
   "markets": [
     {
-      "vault": "0xE51bD7994DcBA4aB9eD0fAe00d2c8dd26c14b5bd",
+      "vault": "0x0d90A6561D8F9399dB6Bb9E8CafbB43269a6f90d",
       "seriesIds": [
         "1",
         "2",

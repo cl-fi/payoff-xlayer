@@ -4,65 +4,94 @@ import { readPositions } from '../src/lib/data/positions';
 import { getConfig } from '../src/lib/config';
 import type { Market } from '../src/lib/types';
 
-test('position discovery respects the public 100-block limit and recovers old series without local storage', async () => {
-  const config = { ...getConfig(), deploymentBlock: '1' };
-  const account = '0x0000000000000000000000000000000000001234';
-  const other = '0x0000000000000000000000000000000000005678';
-  const market = { exchange: other } as Market;
-  const calls: { fromBlock: bigint; toBlock: bigint }[] = [];
-  const client = {
-    getBlock: async ({ blockHash }: any = {}) => ({ number: 1000n, timestamp: blockHash ? 100n : 1000n }),
-    readContract: async ({ functionName, args }: any) => {
-      if (functionName === 'nextPositionId') return 3n;
-      if (functionName === 'position')
-        return {
-          shortHolder: account,
-          seriesId: 1n,
-          wrappedQuantity: 100n,
-          strikeAmountUSDG: 220n,
-          state: args[0] === 1n ? 2 : 1,
-        };
-      if (functionName === 'getSeries')
-        return {
-          side: 0,
-          strikePricePerWrappedUSDG: 220000000n,
-          tradeCutoff: 900n,
-          exerciseStart: 900n,
-          exerciseEnd: 999n,
-        };
-      throw new Error(functionName);
+const config = getConfig();
+const account = '0x0000000000000000000000000000000000001234';
+const exchange = '0x0000000000000000000000000000000000005678';
+const market = { exchange } as Market;
+
+function mockClient(ids: bigint[], shortHolder = account) {
+  const multicalls: string[] = [];
+  const read = (address: string, functionName: string, args: any[]) => {
+    if (functionName === 'positionIdsOf') {
+      assert.equal(address, config.nvdaVault);
+      assert.equal(args[0], account);
+      return ids.slice(Number(args[1]), Number(args[1] + args[2]));
+    }
+    if (functionName === 'position') {
+      assert.equal(address, config.nvdaVault);
+      return {
+        seriesId: 1n,
+        shortHolder,
+        longHolder: exchange,
+        wrappedQuantity: 100n,
+        strikeAmountUSDG: 220n,
+        wrappedBalance: 0n,
+        state: args[0] === 1n ? 2 : 1,
+        openedAt: 100n * args[0],
+      };
+    }
+    if (functionName === 'netPremiumOf') {
+      assert.equal(address, exchange);
+      assert.equal(args[0], config.nvdaVault);
+      return 5n * args[1];
+    }
+    if (functionName === 'getSeries')
+      return {
+        side: 0,
+        strikePricePerWrappedUSDG: 220000000n,
+        tradeCutoff: 900n,
+        exerciseStart: 900n,
+        exerciseEnd: 999n,
+      };
+    throw new Error(functionName);
+  };
+  return {
+    multicalls,
+    getBlock: async () => ({ number: 1000n, timestamp: 1000n }),
+    readContract: async ({ address, functionName, args }: any) => read(address, functionName, args),
+    multicall: async ({ contracts, blockNumber, allowFailure }: any) => {
+      assert.equal(blockNumber, 1000n);
+      assert.equal(allowFailure, false);
+      multicalls.push(contracts[0].functionName);
+      return contracts.map((c: any) => read(c.address, c.functionName, c.args));
     },
-    getLogs: async (range: any) => {
-      calls.push(range);
-      assert.ok(range.toBlock - range.fromBlock < 100n);
-      return [850n, 650n].flatMap((height, i) =>
-        height >= range.fromBlock && height <= range.toBlock
-          ? [
-              {
-                removed: false,
-                blockHash: `0x${'ab'.repeat(32)}`,
-                transactionHash: `0x${String(i + 1).repeat(64)}`,
-                args: { positionId: BigInt(i + 1), taker: account, netPremiumUSDG: 5n },
-              },
-            ]
-          : [],
-      );
+    getLogs: async () => {
+      throw new Error('Position discovery must not scan event logs');
     },
   };
+}
+
+test('an empty wallet renders without any batched reads', async () => {
+  const client = mockClient([]);
+  assert.deepEqual(await readPositions(config, account, market, client as any), []);
+  assert.deepEqual(client.multicalls, []);
+});
+
+test('positions come from the holder index, the premium record and pinned block reads', async () => {
+  const client = mockClient([1n, 2n]);
   const result = await readPositions(config, account, market, client as any);
-  assert.equal(calls.length, 4); // All positions found; do not query the old empty deployment history.
   assert.deepEqual(
-    result.map((p) => [p.id, p.status]),
+    result.map((p) => [p.id, p.status, p.openedAt, p.netPremiumUSDG]),
     [
-      ['2', 'expired'],
-      ['1', 'exercised'],
+      ['2', 'expired', 200, '10'],
+      ['1', 'exercised', 100, '5'],
     ],
   );
   assert.equal(result[0].series.id, '1');
-  assert.equal(result[0].netPremiumUSDG, '5');
-  client.getLogs = async () => [];
-  await assert.rejects(
-    readPositions({ ...config, deploymentBlock: '950' }, account, market, client as any),
-    /Incomplete/,
-  );
+  assert.equal(result[0].series.days, 1);
+  assert.equal(result[0].vault, config.nvdaVault);
+  assert.deepEqual(client.multicalls.sort(), ['getSeries', 'netPremiumOf', 'position']);
+});
+
+test('the holder index is paged and every page is read', async () => {
+  const ids = Array.from({ length: 501 }, (_, i) => BigInt(i + 1));
+  const client = mockClient(ids);
+  const result = await readPositions(config, account, market, client as any);
+  assert.equal(result.length, 501);
+  assert.equal(result[0].id, '501');
+});
+
+test('a position whose short holder is another wallet is rejected', async () => {
+  const client = mockClient([1n], exchange);
+  await assert.rejects(readPositions(config, account, market, client as any), /owner mismatch/);
 });
