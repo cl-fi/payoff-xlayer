@@ -9,8 +9,75 @@ import catalog from '../public/catalog.json' with { type: 'json' };
 import { createDemoQuote } from '../src/lib/data/demo';
 import { previewOrder } from '../src/lib/amounts';
 import type { GatewayQuote, Market } from '../src/lib/types';
+import { routeCandles } from './hyperliquid';
 
 const visibleCount = new Set(catalog.markets[0].series.map((s) => s.exerciseEnd)).size * 3;
+
+test.beforeEach(({ page }) => routeCandles(page));
+
+test('price chart draws every target for the selected expiry and stays linked to the offer table', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(TEST_NOW);
+  await page.route(deployment.rpcUrl, (route) => route.abort());
+  await page.route('https://gateway.example.test/**', (route) => route.fulfill({ json: referenceFixture() }));
+  await page.goto('/');
+  const chart = page.locator('.price-chart');
+  const targets = chart.locator('.price-chart-target');
+  const chartTargets = () => targets.evaluateAll((els) => els.map((el) => el.getAttribute('data-target')));
+  const table = page.getByRole('table', { name: 'Target price and expiry' });
+  const strikes = table.getByRole('rowheader');
+  const selection = page.locator('.order-selection');
+  // Strikes and dates come from the published catalog, so read them from the table instead of fixing them here.
+  const selected = async () => {
+    const [strike, expiry] = (await selection.textContent())!.split(' · ');
+    return { strike: strike.replace(' USDG', '').trim(), expiry: expiry.trim() };
+  };
+  await expect(strikes.first()).toBeVisible();
+  const rows = await strikes.allTextContents();
+  expect(rows.length).toBeGreaterThanOrEqual(3);
+  await expect.poll(chartTargets).toEqual(rows);
+  const first = await selected();
+  await expect(chart.locator('.price-chart-target.selected')).toHaveAttribute('data-target', first.strike);
+  await expect(chart.locator('.price-chart-zone')).toHaveCount(1);
+  await expect(chart.locator('.price-chart-axis .expiry')).toHaveText(first.expiry);
+
+  // Hovering a table row highlights its line without changing the order.
+  await table.getByRole('row', { name: new RegExp(`^${rows[1].replace('.', '\\.')}`) }).hover();
+  await expect(chart.locator('.price-chart-target.active')).toHaveAttribute('data-target', rows[1]);
+  await expect(selection).toHaveText(`${first.strike} USDG · ${first.expiry}`);
+
+  // Clicking a line on the chart selects that target for the charted expiry.
+  // Playwright sees the transparent hit stroke as invisible, so click where it is drawn.
+  await chart.locator('.nvda-chart-frame svg').scrollIntoViewIfNeeded();
+  const line = await chart.locator(`.price-chart-target[data-target="${rows[2]}"] line.hit`).boundingBox();
+  await page.mouse.click(line!.x + line!.width / 4, line!.y + line!.height / 2);
+  await expect(selection).toHaveText(`${rows[2]} USDG · ${first.expiry}`);
+
+  // Selecting the latest expiry stretches the chart to it.
+  await table.locator('tbody tr').nth(1).getByRole('button').last().click();
+  const later = await selected();
+  expect(later.expiry).not.toBe(first.expiry);
+  await expect(chart.locator('.price-chart-axis .expiry')).toHaveText(later.expiry);
+  await expect(chart.locator('.price-chart-target.selected')).toHaveAttribute('data-target', rows[1]);
+
+  await page.getByRole('tab', { name: /Sell High/ }).click();
+  await expect(strikes.first()).not.toHaveText(rows[0]);
+  await expect.poll(chartTargets).toEqual(await strikes.allTextContents());
+  await expect(chart.locator('.price-chart-zone')).toHaveCount(1);
+
+  // The refresh ring fetches the reference immediately, and the price history follows the same round.
+  let polls = 0,
+    candles = 0;
+  page.on('request', (r) => {
+    if (r.url().endsWith('/v1/reference-quotes')) polls++;
+    if (r.url().startsWith('https://api.hyperliquid.xyz/')) candles++;
+  });
+  await chart.getByRole('button', { name: 'Refresh price' }).click();
+  await expect.poll(() => polls, { timeout: 3000 }).toBeGreaterThan(0);
+  await expect.poll(() => candles, { timeout: 3000 }).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
 
 test('price changes move offers without silently replacing the selected order; stale prices pause and recover', async ({
   page,

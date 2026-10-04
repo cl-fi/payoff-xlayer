@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import deployment from '../../config/xlayer-testnet.json' with { type: 'json' };
 import { formatUnits } from 'viem';
 import { fixtureRpc, TEST_ACCOUNT, TEST_NOW, TEST_RATE } from '../test/testnet-fixture';
+import { routeCandles } from './hyperliquid';
 
 async function setup(page: Page, options: { offline?: boolean; wrongChain?: boolean } = {}) {
   await page.clock.setFixedTime(TEST_NOW);
@@ -57,6 +58,8 @@ async function connect(page: Page) {
   await expect(page.getByRole('button', { name: 'Use demo account' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Browser wallet' }).click();
 }
+
+test.beforeEach(({ page }) => routeCandles(page));
 
 test('deployed offers, real balances and unavailable quotes', async ({ page }, testInfo) => {
   const errors: string[] = [];

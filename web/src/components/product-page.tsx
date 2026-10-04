@@ -17,13 +17,13 @@ import {
   stockTarget,
 } from '@/lib/amounts';
 import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
-import { quoteTerms, type AppQuote, type Position, type QuantityUnit } from '@/lib/types';
+import { quoteTerms, type AppQuote, type Position, type ProductSeries, type QuantityUnit } from '@/lib/types';
 import { friendlyError, switchNetwork } from '@/lib/wallet';
 import { GatewayAdapter } from '@/lib/data/gateway';
 import { TradingWallet } from '@/lib/transactions';
 import { UserFacingError } from '@/lib/errors';
 import { referenceEstimate, referenceQuote } from '@/lib/data/reference';
-import { NvidiaPriceChart } from './nvidia-price-chart';
+import { PriceChart, type ChartTarget } from './price-chart';
 import { ScenarioPreview } from './scenario-preview';
 import { TokenIcon } from './token-icon';
 import { nearestSeries, usablePrice } from '../../../sdk/eligibility.mjs';
@@ -44,13 +44,16 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     activity,
     references,
     referenceError,
+    referenceSchedule,
+    refreshReferences,
     balancesError,
   } = useProduct();
   const [side, setSide] = useState<0 | 1>(initialSide),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
     [selectedExpiry, setSelectedExpiry] = useState<string | null>(null),
     [quantity, setQuantity] = useState('1'),
-    [quantityUnit, setQuantityUnit] = useState<QuantityUnit>('stock');
+    [quantityUnit, setQuantityUnit] = useState<QuantityUnit>('stock'),
+    [hoveredStrike, setHoveredStrike] = useState<string | null>(null);
   const [quote, setQuote] = useState<AppQuote | null>(null),
     [dialog, setDialog] = useState<'assets' | 'quote' | 'success' | null>(null);
   const [busy, setBusy] = useState(''),
@@ -265,6 +268,35 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const displayQuantity = preview ? (wrappedInput ? preview.wrappedQuantity : preview.stockEquivalent) : null;
   const expiryLabel = (s: { exerciseEnd: string; days: number }) =>
     config.mode === 'demo' ? `${s.days} days` : dateOnly(s.exerciseEnd, timeZone);
+  const offerApr = (s: ProductSeries) => {
+    const reference =
+      config.mode === 'gateway' && market ? referenceQuote(references, s, market.rate, now) : null;
+    const bps = reference
+      ? aprBps(
+          reference.netPremiumPerWrappedUSDG,
+          s.strikePricePerWrappedUSDG,
+          Number(s.exerciseEnd) - now / 1000,
+        )
+      : null;
+    return bps === null ? null : `${rounded(bps, 2, 1)}%`;
+  };
+  // The chart plots every target offered for the selected expiry, in stock terms like the price line.
+  const chartExpiry = series?.exerciseEnd ?? expiry;
+  const chartTargets: ChartTarget[] =
+    market && chartExpiry
+      ? strikes.flatMap((strike) => {
+          const s = offer(strike, chartExpiry);
+          return s
+            ? [{ key: strike, price: Number(stockTarget(s, market.rate)) / 1e6, apr: offerApr(s) }]
+            : [];
+        })
+      : [];
+  const selectStrike = (strike: string) => {
+    const s = chartExpiry ? offer(strike, chartExpiry) : undefined;
+    if (!s) return;
+    setSelectedSeries(s.id);
+    setSelectedExpiry(s.exerciseEnd);
+  };
   return (
     <div className="page product-page">
       <section className="page-intro">
@@ -315,24 +347,31 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               <h2>NVDAx</h2>
             </div>
           </div>
-          <NvidiaPriceChart />
-          {requiresPrice && (
-            <div className="market-reference" role="status">
-              <div>
-                <span>Hyperliquid reference</span>
-                <strong>
-                  {priceReady && price?.status === 'available'
-                    ? `$${amount(price.priceMicros)}`
-                    : 'Temporarily unavailable'}
-                </strong>
-              </div>
-              <small title="Uses the xyz:NVDA oracle reference. Fetched time is our last successful request, not the source quote time. This may differ from the stock chart.">
-                {price?.status === 'available'
-                  ? `Fetched ${Math.max(0, Math.floor((now - price.fetchedAtMs) / 1000))}s ago${priceReady ? '' : ' · stale'}`
-                  : 'Waiting for reference price…'}
-              </small>
-            </div>
-          )}
+          <PriceChart
+            coin={price?.coin ?? 'xyz:NVDA'}
+            side={side}
+            nowMs={now}
+            expiryMs={chartExpiry ? Number(chartExpiry) * 1000 : null}
+            expiryLabel={
+              chartExpiry ? dateOnly(chartExpiry, config.mode === 'demo' ? undefined : timeZone) : null
+            }
+            timeZone={timeZone}
+            targets={chartTargets}
+            selected={series && series.exerciseEnd === chartExpiry ? series.strikePricePerWrappedUSDG : null}
+            highlighted={hoveredStrike}
+            reference={
+              requiresPrice
+                ? {
+                    price:
+                      priceReady && price?.status === 'available' ? Number(price.priceMicros) / 1e6 : null,
+                    schedule: referenceSchedule,
+                    onRefresh: refreshReferences,
+                  }
+                : null
+            }
+            onSelect={selectStrike}
+            onHighlight={setHoveredStrike}
+          />
           <div className="offer-panel">
             {available.length ? (
               <table className="offer-table" aria-label="Target price and expiry">
@@ -369,7 +408,12 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                       ? amount(wrappedInput ? strike : stockTarget(sample, market.rate))
                       : '—';
                     return (
-                      <tr key={strike}>
+                      <tr
+                        key={strike}
+                        className={hoveredStrike === strike ? 'highlighted' : undefined}
+                        onMouseEnter={() => setHoveredStrike(strike)}
+                        onMouseLeave={() => setHoveredStrike(null)}
+                      >
                         <th scope="row">{target}</th>
                         {row.map((s, index) => {
                           const end = expiries[index];
@@ -379,18 +423,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                                 <span className="offer-empty">—</span>
                               </td>
                             );
-                          const reference =
-                            config.mode === 'gateway' && market
-                              ? referenceQuote(references, s, market.rate, now)
-                              : null;
-                          const strikeApr = reference
-                            ? aprBps(
-                                reference.netPremiumPerWrappedUSDG,
-                                s.strikePricePerWrappedUSDG,
-                                Number(s.exerciseEnd) - now / 1000,
-                              )
-                            : null;
-                          const aprLabel = strikeApr === null ? null : `${rounded(strikeApr, 2, 1)}% APR`;
+                          const strikeApr = offerApr(s);
+                          const aprLabel = strikeApr === null ? null : `${strikeApr} APR`;
                           const selected = s.id === series?.id;
                           return (
                             <td key={end}>

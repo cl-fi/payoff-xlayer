@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { routeCandles } from './hyperliquid';
 async function connect(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Connect to get started' }).click();
@@ -42,6 +43,8 @@ for (const side of ['Buy Low', 'Sell High'] as const)
       expect(errors).toEqual([]);
     });
   }
+test.beforeEach(({ page }) => routeCandles(page));
+
 test('no quote, expired and cancelled confirmations never create a position', async ({ page }) => {
   await connect(page);
   await scenario(page, 'No quotes');

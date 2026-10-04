@@ -31,6 +31,11 @@ import { shortAddress } from '@/lib/amounts';
 import { Modal } from './modal';
 import { Icon } from './icon';
 
+export const REFERENCE_POLL_MS = 10000;
+// When the next scheduled reference poll fires (null while a request is in flight). Each poll,
+// scheduled or manual, gets a new round so dependent data such as the price chart can follow it.
+export type ReferenceSchedule = { nextAtMs: number | null; intervalMs: number; round: number };
+
 type ContextValue = {
   config: Config;
   adapter: ProductAdapter | null;
@@ -42,6 +47,8 @@ type ContextValue = {
   balancesError: string;
   references: ReferenceSnapshot | null;
   referenceError: string;
+  referenceSchedule: ReferenceSchedule | null;
+  refreshReferences: () => void;
   activity: Activity[];
   connection: Connection | null;
   loading: boolean;
@@ -76,6 +83,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [balancesError, setBalancesError] = useState('');
   const [references, setReferences] = useState<ReferenceSnapshot | null>(null);
   const [referenceError, setReferenceError] = useState('');
+  const [referenceSchedule, setReferenceSchedule] = useState<ReferenceSchedule | null>(null);
+  const refreshNow = useRef<() => void>(() => {});
   const [activity, setActivity] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
@@ -116,9 +125,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [config, connection]);
   useEffect(() => {
     if (!(adapter instanceof GatewayAdapter)) return;
-    let cancelled = false;
+    let cancelled = false,
+      inFlight = false,
+      round = 0;
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
+      // A manual refresh replaces the pending poll; overlapping requests are not started.
+      if (inFlight) return;
+      inFlight = true;
+      clearTimeout(timer);
+      round++;
+      setReferenceSchedule({ nextAtMs: null, intervalMs: REFERENCE_POLL_MS, round });
       try {
         const snapshot = await adapter.references();
         if (cancelled) return;
@@ -132,15 +149,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {
         if (!cancelled) setReferenceError('Reference updates are temporarily unavailable.');
       } finally {
-        if (!cancelled) timer = setTimeout(() => void refresh(), 10000);
+        inFlight = false;
+        if (!cancelled) {
+          setReferenceSchedule({
+            nextAtMs: Date.now() + REFERENCE_POLL_MS,
+            intervalMs: REFERENCE_POLL_MS,
+            round,
+          });
+          timer = setTimeout(() => void refresh(), REFERENCE_POLL_MS);
+        }
       }
     };
+    refreshNow.current = () => void refresh();
     void refresh();
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      refreshNow.current = () => {};
+      setReferenceSchedule(null);
     };
   }, [adapter, config]);
+  const refreshReferences = useCallback(() => refreshNow.current(), []);
   const reload = useCallback(async () => {
     if (
       !adapter ||
@@ -320,6 +349,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       balancesError,
       references,
       referenceError,
+      referenceSchedule,
+      refreshReferences,
       activity,
       connection,
       loading,
@@ -345,6 +376,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       balancesError,
       references,
       referenceError,
+      referenceSchedule,
+      refreshReferences,
       activity,
       connection,
       loading,
