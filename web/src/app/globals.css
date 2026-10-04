@@ -1180,11 +1180,60 @@ summary:focus-visible {
 .quantity-input.invalid:focus-within {
   box-shadow: 0 0 0 3px var(--neg-tint);
 }
-.field-error {
+.field-error,
+.deposit-conversion {
   font-size: 12px;
   line-height: 1.55;
   color: var(--n-500);
   margin: 8px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.field-error .text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.quantity-input > .unit-fixed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--n-900);
+}
+.balance-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+.balance-shortcuts button {
+  padding: 5px 0;
+  border: 1px solid var(--n-200);
+  border-radius: 6px;
+  background: var(--n-0);
+  color: var(--n-700);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.balance-shortcuts button:hover:not(:disabled) {
+  border-color: var(--n-900);
+  color: var(--n-900);
+}
+.balance-shortcuts button:disabled {
+  color: var(--n-300);
+  cursor: default;
 }
 .field-error {
   color: var(--neg);

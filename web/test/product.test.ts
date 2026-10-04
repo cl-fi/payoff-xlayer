@@ -13,7 +13,19 @@ import {
   STORAGE_PREFIX,
   type Storage,
 } from '../src/lib/data/demo';
-import { apr, aprBps, parseQuantity, previewOrder, rounded, WAD } from '../src/lib/amounts';
+import {
+  apr,
+  aprBps,
+  balanceInput,
+  exceedsBalance,
+  maxWrappedQuantity,
+  parseQuantity,
+  precise,
+  previewOrder,
+  rounded,
+  WAD,
+} from '../src/lib/amounts';
+import { parseUnits } from 'viem';
 
 test('aprBps backs both the two-decimal APR and the one-decimal strike labels', () => {
   const year = 31536000;
@@ -105,27 +117,97 @@ test('invalid, underflowing and overflowing amounts are rejected', () => {
     assert.throws(() => preview(0, input));
   assert.throws(() => preview(0, '0.000000000000000001'));
 });
-test('native and wrapped inputs express the same order at a non-unit rate; direct units retain 18-digit precision', () => {
+test('a USDG deposit never locks more than typed and converts at the series strike', () => {
   for (const side of [0, 1] as const) {
     const series = market.series.find((s) => s.side === side)!;
-    const native = previewOrder('1.003', series, market, DEMO_ACCOUNT, 'stock');
-    const wrapped = previewOrder('1', series, market, DEMO_ACCOUNT, 'wrapped');
-    assert.deepEqual(native.order, wrapped.order);
-    assert.equal(wrapped.wrappedQuantity, WAD.toString());
-    assert.equal(wrapped.stockEquivalent, '1003000000000000000');
-    assert.equal(wrapped.strikeAmountUSDG, native.strikeAmountUSDG);
-    assert.equal(wrapped.strikeAmountUSDG, series.strikePricePerWrappedUSDG);
-    assert.equal(
-      previewOrder('1.000000000000000001', series, market, DEMO_ACCOUNT, 'wrapped').wrappedQuantity,
-      (WAD + 1n).toString(),
+    for (const input of ['1000', '999.999999', '175.52', '0.01', '12345.678901']) {
+      const p = previewOrder(input, series, market, DEMO_ACCOUNT, 'usdg');
+      const typed = parseUnits(input, 6);
+      assert(BigInt(p.strikeAmountUSDG) <= typed, input);
+      // One more wrapped unit would lock more than typed: the conversion uses all of it.
+      assert(
+        ((BigInt(p.wrappedQuantity) + 1n) * BigInt(series.strikePricePerWrappedUSDG) + WAD - 1n) / WAD >
+          typed,
+        input,
+      );
+      assert.equal(p.inputUnit, 'usdg');
+      assert.equal(p.inputQuantity, typed.toString());
+    }
+    // Exactly one wrapped token's worth of USDG buys exactly one wrapped token.
+    const one = previewOrder(
+      precise(series.strikePricePerWrappedUSDG, 6),
+      series,
+      market,
+      DEMO_ACCOUNT,
+      'usdg',
+    );
+    assert.equal(one.wrappedQuantity, WAD.toString());
+    assert.equal(one.strikeAmountUSDG, series.strikePricePerWrappedUSDG);
+    assert.throws(
+      () =>
+        previewOrder(
+          '0.000001',
+          { ...series, strikePricePerWrappedUSDG: (10n ** 30n).toString() },
+          market,
+          DEMO_ACCOUNT,
+          'usdg',
+        ),
+      /too small/,
     );
     assert.throws(
-      () => previewOrder('1', series, { ...market, rate: '0' }, DEMO_ACCOUNT, 'wrapped'),
+      () => previewOrder('1', series, { ...market, rate: '0' }, DEMO_ACCOUNT, 'usdg'),
       /wrapping rate/,
     );
-    for (const input of ['0', '-1', '1e2', '1.0000000000000000001'])
-      assert.throws(() => previewOrder(input, series, market, DEMO_ACCOUNT, 'wrapped'));
+    for (const input of ['0', '-1', '1e2', '1,000', '1.0000001'])
+      assert.throws(() => previewOrder(input, series, market, DEMO_ACCOUNT, 'usdg'), /USDG amount/);
   }
+});
+test('balance shortcuts round down to orders the wallet can fund', () => {
+  const balances = {
+    usdg: '1234567891',
+    stock: '2500000000000000001',
+    wrapped: '300000000000000000',
+    usdgAllowance: '0',
+    wrappedAllowance: '0',
+  };
+  const buy = market.series.find((s) => s.side === 0)!,
+    sell = market.series.find((s) => s.side === 1)!;
+  assert.equal(balanceInput(balances, buy, market.rate, 'usdg', 100), '1234.567891');
+  assert.equal(balanceInput(balances, buy, market.rate, 'usdg', 25), '308.64');
+  assert.equal(
+    balanceInput(
+      { ...balances, stock: '8000000000000000000', wrapped: '0' },
+      sell,
+      market.rate,
+      'stock',
+      100,
+    ),
+    '8',
+  );
+  for (const [series, unit] of [
+    [buy, 'usdg'],
+    [buy, 'stock'],
+    [sell, 'stock'],
+  ] as const)
+    for (const percent of [25, 50, 75, 100]) {
+      const text = balanceInput(balances, series, market.rate, unit, percent);
+      assert.match(text, /^\d+(\.\d{1,6})?$/);
+      const p = previewOrder(text, series, market, DEMO_ACCOUNT, unit);
+      assert.equal(exceedsBalance(balances, p), false, `${series.side} ${unit} ${percent}`);
+      assert(BigInt(p.wrappedQuantity) <= maxWrappedQuantity(balances, series, market.rate));
+    }
+  // Sell High counts NVDAx that preparing the order would wrap, and the demo preparation agrees.
+  const all = previewOrder(
+    balanceInput(balances, sell, market.rate, 'stock', 100),
+    sell,
+    market,
+    DEMO_ACCOUNT,
+  );
+  assert(BigInt(all.wrappedQuantity) > BigInt(balances.wrapped));
+  const state = { ...initialDemoState(), balances };
+  assert.doesNotThrow(() => prepareDemo(state, all));
+  assert.equal(exceedsBalance(balances, previewOrder('1235', buy, market, DEMO_ACCOUNT, 'usdg')), true);
+  assert.equal(exceedsBalance(balances, previewOrder('3', sell, market, DEMO_ACCOUNT)), true);
 });
 for (const side of [0, 1] as const)
   for (const outcome of ['exercised', 'expired'] as const) {

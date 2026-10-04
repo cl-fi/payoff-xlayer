@@ -3,6 +3,7 @@ import deployment from '../../config/xlayer-testnet.json' with { type: 'json' };
 import { formatUnits } from 'viem';
 import { fixtureRpc, TEST_ACCOUNT, TEST_NOW, TEST_RATE } from '../test/testnet-fixture';
 import { routeCandles } from './hyperliquid';
+import { amount, WAD } from '../src/lib/amounts';
 
 async function setup(page: Page, options: { offline?: boolean; wrongChain?: boolean } = {}) {
   await page.clock.setFixedTime(TEST_NOW);
@@ -83,7 +84,10 @@ test('deployed offers, real balances and unavailable quotes', async ({ page }, t
   await page.getByRole('tab', { name: 'Sell High' }).click();
   await connect(page);
   await expect(page.getByRole('button', { name: 'Quotes unavailable', exact: true })).toBeDisabled();
-  await expect(page.locator('.available-balance')).toContainText('50.0000 NVDAx');
+  // Sell High counts NVDAx and the NVDAx value of wrapped tokens; the fixture holds 50 of each.
+  await expect(page.locator('.available-balance')).toContainText(
+    `${amount(50n * WAD + (50n * WAD * BigInt(TEST_RATE)) / WAD, 18, 4)} NVDAx`,
+  );
   await page.screenshot({ path: testInfo.outputPath('testnet-product.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.getByRole('link', { name: 'Portfolio', exact: true }).click();

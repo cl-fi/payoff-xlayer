@@ -9,12 +9,17 @@ import {
   amount,
   apr,
   aprBps,
+  balanceInput,
   dateOnly,
   dateTime,
+  exceedsBalance,
+  maxWrappedQuantity,
+  plainDecimal,
   precise,
   previewOrder,
   rounded,
   stockTarget,
+  WAD,
 } from '@/lib/amounts';
 import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
 import { quoteTerms, type AppQuote, type Position, type ProductSeries, type QuantityUnit } from '@/lib/types';
@@ -27,6 +32,8 @@ import { PriceChart, type ChartTarget } from './price-chart';
 import { ScenarioPreview } from './scenario-preview';
 import { TokenIcon } from './token-icon';
 import { nearestSeries, usablePrice } from '../../../sdk/eligibility.mjs';
+
+type Deposit = { value: string; unit: QuantityUnit; before?: { value: string; unit: QuantityUnit } };
 
 export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const {
@@ -51,9 +58,15 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const [side, setSide] = useState<0 | 1>(initialSide),
     [selectedSeries, setSelectedSeries] = useState<string | null>(null),
     [selectedExpiry, setSelectedExpiry] = useState<string | null>(null),
-    [quantity, setQuantity] = useState('1'),
-    [quantityUnit, setQuantityUnit] = useState<QuantityUnit>('stock'),
+    // Each side keeps its own deposit: Buy Low starts in USDG, Sell High in NVDAx.
+    [deposits, setDeposits] = useState<Record<0 | 1, Deposit>>({
+      0: { value: '1000', unit: 'usdg' },
+      1: { value: '1', unit: 'stock' },
+    }),
     [hoveredStrike, setHoveredStrike] = useState<string | null>(null);
+  const { value: quantity, unit: quantityUnit } = deposits[side];
+  const setDeposit = (value: string, unit = quantityUnit, before?: Deposit['before']) =>
+    setDeposits((d) => ({ ...d, [side]: { value, unit, before } }));
   const [quote, setQuote] = useState<AppQuote | null>(null),
     [dialog, setDialog] = useState<'assets' | 'quote' | 'success' | null>(null);
   const [busy, setBusy] = useState(''),
@@ -118,7 +131,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     }
   }, [quantity, quantityUnit, series, market, connection?.address]);
   const preview = calculation.preview,
-    prepared = !!(balances && preview && isPrepared(balances, preview));
+    prepared = !!(balances && preview && isPrepared(balances, preview)),
+    overBalance = !!(connection && balances && preview && exceedsBalance(balances, preview));
   const estimate = referenceEstimate(references, preview, now);
   const terms = quote ? quoteTerms(quote) : null,
     remaining = terms ? Math.max(0, Math.ceil(Number(terms.deadline) - now / 1000)) : 0;
@@ -258,14 +272,48 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     void inquire();
   };
   const isPut = side === 0;
-  const wrappedInput = quantityUnit === 'wrapped';
-  const displayTarget =
-    series && market
-      ? wrappedInput
-        ? BigInt(series.strikePricePerWrappedUSDG)
-        : stockTarget(series, market.rate)
-      : null;
-  const displayQuantity = preview ? (wrappedInput ? preview.wrappedQuantity : preview.stockEquivalent) : null;
+  const usdgInput = quantityUnit === 'usdg';
+  const displayTarget = series && market ? stockTarget(series, market.rate) : null;
+  // Sell High can also use NVDAx that preparing the order wraps, so the balance counts both.
+  const balanceLabel = balances
+    ? isPut
+      ? `${amount(balances.usdg)} USDG`
+      : `${amount(BigInt(balances.stock) + (market ? (BigInt(balances.wrapped) * BigInt(market.rate)) / WAD : 0n), 18, 4)} NVDAx`
+    : '';
+  const shortcutsDisabled =
+    !balances || !series || !market || maxWrappedQuantity(balances, series, market.rate) === 0n;
+  const fillFromBalance = (percent: number) => {
+    if (balances && series && market)
+      setDeposit(balanceInput(balances, series, market.rate, quantityUnit, percent));
+  };
+  // Switching units re-expresses the same order, rounded down, instead of reinterpreting the number.
+  // Switching back before editing restores the typed number, so a round trip does not drift.
+  const switchUnit = (unit: QuantityUnit) => {
+    if (unit === quantityUnit) return;
+    const { before } = deposits[side];
+    if (before?.unit === unit) return setDeposit(before.value, unit);
+    setDeposit(
+      preview
+        ? unit === 'usdg'
+          ? plainDecimal(preview.strikeAmountUSDG, 6, 2)
+          : plainDecimal(preview.stockEquivalent, 18, 6)
+        : quantity,
+      unit,
+      { value: quantity, unit: quantityUnit },
+    );
+  };
+  const target = displayTarget === null ? '—' : amount(displayTarget);
+  const conversion = !preview
+    ? null
+    : !isPut
+      ? `≈ ${amount(preview.strikeAmountUSDG)} USDG if sold at ${target}`
+      : usdgInput
+        ? `≈ ${rounded(preview.stockEquivalent, 18, 4)} NVDAx if bought at ${target}` +
+          (preview.strikeAmountUSDG === preview.inputQuantity
+            ? ''
+            : ` · locks ${precise(preview.strikeAmountUSDG, 6)} USDG`)
+        : `Locks ${amount(preview.strikeAmountUSDG)} USDG at ${target}`;
+  const fieldError = calculation.error || (overBalance ? `Exceeds your ${balanceLabel} balance.` : '');
   const expiryLabel = (s: { exerciseEnd: string; days: number }) =>
     config.mode === 'demo' ? `${s.days} days` : dateOnly(s.exerciseEnd, timeZone);
   const offerApr = (s: ProductSeries) => {
@@ -378,7 +426,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                 <thead>
                   <tr>
                     <th scope="col">
-                      Target price<small>USDG per {wrappedInput ? 'wNVDAx' : 'NVDAx'}</small>
+                      Target price<small>USDG per NVDAx</small>
                     </th>
                     {expiries.map((end) => {
                       const s = openSeries.find((s) => s.exerciseEnd === end)!;
@@ -404,9 +452,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                   {strikes.map((strike) => {
                     const row = expiries.map((end) => offer(strike, end));
                     const sample = row.find((s) => !!s)!;
-                    const target = market
-                      ? amount(wrappedInput ? strike : stockTarget(sample, market.rate))
-                      : '—';
+                    const target = market ? amount(stockTarget(sample, market.rate)) : '—';
                     return (
                       <tr
                         key={strike}
@@ -496,16 +542,10 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           )}
           <ScenarioPreview
             isPut={isPut}
-            unit={wrappedInput ? 'wNVDAx' : 'NVDAx'}
-            approximate={!wrappedInput}
+            unit="NVDAx"
+            approximate
             target={displayTarget === null ? null : amount(displayTarget)}
-            quantity={
-              displayQuantity === null
-                ? null
-                : wrappedInput
-                  ? amount(displayQuantity, 18, 6)
-                  : rounded(displayQuantity, 18, 4)
-            }
+            quantity={preview ? rounded(preview.stockEquivalent, 18, 4) : null}
             usdg={preview?.strikeAmountUSDG ?? null}
             premium={estimate?.netPremiumUSDG ?? null}
             premiumLabel={config.mode === 'gateway' ? 'Est. premium' : 'Premium'}
@@ -521,41 +561,83 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             settle={series ? dateOnly(series.exerciseEnd, timeZone) : null}
           />
           <div className="field-label quantity-label">
-            <label htmlFor="quantity">Quantity</label>
+            <label htmlFor="quantity">You deposit</label>
             {balances && (
-              <span className="available-balance">
+              <span
+                className="available-balance"
+                title={
+                  isPut
+                    ? undefined
+                    : `${amount(balances.stock, 18, 4)} NVDAx + ${amount(balances.wrapped, 18, 4)} wNVDAx`
+                }
+              >
                 <Icon name="wallet" size={13} />
-                {isPut
-                  ? `${amount(balances.usdg)} USDG`
-                  : `${amount(balances.stock, 18, 4)} NVDAx · ${amount(balances.wrapped, 18, 4)} wNVDAx`}
+                {balanceLabel}
               </span>
             )}
           </div>
-          <div className={`quantity-input ${calculation.error ? 'invalid' : ''}`}>
+          <div className={`quantity-input ${fieldError ? 'invalid' : ''}`}>
             <input
               id="quantity"
               inputMode="decimal"
               autoComplete="off"
               value={quantity}
-              aria-invalid={!!calculation.error}
-              aria-describedby={calculation.error ? 'quantity-error' : undefined}
-              onChange={(e) => setQuantity(e.target.value)}
+              aria-invalid={!!fieldError}
+              aria-describedby={
+                fieldError ? 'quantity-error' : conversion ? 'quantity-conversion' : undefined
+              }
+              onChange={(e) => setDeposit(e.target.value)}
             />
-            <div className="unit-toggle" role="group" aria-label="Quantity unit">
-              <button type="button" aria-pressed={!wrappedInput} onClick={() => setQuantityUnit('stock')}>
+            {isPut ? (
+              <div className="unit-toggle" role="group" aria-label="Deposit unit">
+                <button type="button" aria-pressed={usdgInput} onClick={() => switchUnit('usdg')}>
+                  <TokenIcon symbol="USDG" size={16} />
+                  USDG
+                </button>
+                <button type="button" aria-pressed={!usdgInput} onClick={() => switchUnit('stock')}>
+                  <TokenIcon symbol="NVDAx" size={16} />
+                  NVDAx
+                </button>
+              </div>
+            ) : (
+              <span className="unit-fixed">
                 <TokenIcon symbol="NVDAx" size={16} />
                 NVDAx
-              </button>
-              <button type="button" aria-pressed={wrappedInput} onClick={() => setQuantityUnit('wrapped')}>
-                <TokenIcon symbol="wNVDAx" size={16} />
-                wNVDAx
-              </button>
-            </div>
+              </span>
+            )}
           </div>
-          {calculation.error && (
+          {fieldError ? (
             <p id="quantity-error" className="field-error">
-              {calculation.error}
+              {fieldError}
+              {overBalance && !calculation.error && !shortcutsDisabled && (
+                <>
+                  {' '}
+                  <button type="button" className="text-button" onClick={() => fillFromBalance(100)}>
+                    Use max
+                  </button>
+                </>
+              )}
             </p>
+          ) : (
+            conversion && (
+              <p id="quantity-conversion" className="deposit-conversion">
+                {conversion}
+              </p>
+            )
+          )}
+          {balances && (
+            <div className="balance-shortcuts" role="group" aria-label="Use part of your balance">
+              {[25, 50, 75, 100].map((percent) => (
+                <button
+                  key={percent}
+                  type="button"
+                  disabled={shortcutsDisabled}
+                  onClick={() => fillFromBalance(percent)}
+                >
+                  {percent === 100 ? 'Max' : `${percent}%`}
+                </button>
+              ))}
+            </div>
           )}
           {balancesError && (
             <div className="notice" role="status">
@@ -575,6 +657,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               !preview ||
               cutoff ||
               pending ||
+              overBalance ||
               !priceReady ||
               selectionUnavailable ||
               (readOnly && !!connection)
@@ -593,6 +676,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               'Quotes unavailable'
             ) : wrongNetwork ? (
               'Switch to X Layer Testnet'
+            ) : overBalance ? (
+              `Insufficient ${isPut ? 'USDG' : 'NVDAx'}`
             ) : pending ? (
               'Transaction pending'
             ) : !prepared ? (

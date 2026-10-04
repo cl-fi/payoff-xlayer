@@ -1,7 +1,7 @@
 import { UserFacingError } from './errors';
 import { formatUnits, parseUnits, type Address } from 'viem';
 import { strikeAmountUSDG } from '../../../sdk/wrapped-assets.mjs';
-import type { Market, Preview, ProductSeries, QuantityUnit } from './types';
+import type { Balances, Market, Preview, ProductSeries, QuantityUnit } from './types';
 export const WAD = 10n ** 18n;
 export const ceilDiv = (a: bigint, b: bigint) => (a + b - 1n) / b;
 
@@ -12,6 +12,13 @@ export function parseQuantity(input: string) {
   if (amount <= 0n || amount >= 1n << 256n) throw new UserFacingError('Enter a valid stock quantity.');
   return amount;
 }
+export function parseUSDG(input: string) {
+  if (!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(input))
+    throw new UserFacingError('Enter a USDG amount greater than 0, with up to 6 decimal places.');
+  const amount = parseUnits(input, 6);
+  if (amount <= 0n || amount >= 1n << 256n) throw new UserFacingError('Enter a valid USDG amount.');
+  return amount;
+}
 export function previewOrder(
   input: string,
   series: ProductSeries,
@@ -19,12 +26,21 @@ export function previewOrder(
   account: Address,
   unit: QuantityUnit = 'stock',
 ): Preview {
-  const inputQuantity = parseQuantity(input);
+  const inputQuantity = unit === 'usdg' ? parseUSDG(input) : parseQuantity(input);
   const rate = BigInt(market.rate);
   if (rate <= 0n) throw new UserFacingError('The wrapping rate is unavailable. Please try again later.');
-  const quantity = unit === 'wrapped' ? inputQuantity : (inputQuantity * WAD) / rate;
+  // A USDG amount converts at the series' own wrapped strike, rounding down, so the settlement amount
+  // (rounded up by the SDK) never exceeds what was typed.
+  const quantity =
+    unit === 'usdg'
+      ? (inputQuantity * WAD) / BigInt(series.strikePricePerWrappedUSDG)
+      : (inputQuantity * WAD) / rate;
   if (quantity === 0n)
-    throw new UserFacingError('This quantity converts to less than one smallest wrapped token unit.');
+    throw new UserFacingError(
+      unit === 'usdg'
+        ? 'This amount is too small for one smallest wrapped token unit at this target.'
+        : 'This quantity converts to less than one smallest wrapped token unit.',
+    );
   const strike = strikeAmountUSDG(quantity, series.strikePricePerWrappedUSDG);
   return {
     order: { taker: account, vault: series.vault, seriesId: series.id, wrappedQuantity: quantity.toString() },
@@ -36,6 +52,47 @@ export function previewOrder(
     strikeAmountUSDG: strike.toString(),
     rate: market.rate,
   };
+}
+// The largest order the wallet can fund: USDG at the series strike for Buy Low; for Sell High, wrapped
+// tokens plus the NVDAx that preparing the order would wrap.
+export function maxWrappedQuantity(balances: Balances, series: ProductSeries, rate: string) {
+  return series.side === 0
+    ? (BigInt(balances.usdg) * WAD) / BigInt(series.strikePricePerWrappedUSDG)
+    : BigInt(balances.wrapped) + (BigInt(balances.stock) * WAD) / BigInt(rate);
+}
+export function exceedsBalance(balances: Balances, preview: Preview) {
+  return preview.series.side === 0
+    ? BigInt(preview.strikeAmountUSDG) > BigInt(balances.usdg)
+    : BigInt(preview.wrappedQuantity) > maxWrappedQuantity(balances, preview.series, preview.rate);
+}
+// Plain decimal text for an input field (no grouping), rounded down to `places`.
+export const plainDecimal = (value: string | bigint, decimals: number, places: number) =>
+  formatUnits(BigInt(value) - (BigInt(value) % 10n ** BigInt(decimals - places)), decimals);
+/**
+ * Deposit field text for a share of the balance. Every conversion rounds down, so the order the text
+ * parses back to stays within the balance. Max keeps full USDG precision; shares round to cents.
+ */
+export function balanceInput(
+  balances: Balances,
+  series: ProductSeries,
+  rate: string,
+  unit: QuantityUnit,
+  percent: number,
+) {
+  const share = (value: bigint) => (value * BigInt(percent)) / 100n;
+  if (unit === 'usdg' && series.side === 0)
+    return plainDecimal(share(BigInt(balances.usdg)), 6, percent === 100 ? 6 : 2);
+  // Sell High in NVDAx starts from the NVDAx balance itself, so Max of a whole balance stays whole.
+  if (unit === 'stock' && series.side === 1)
+    return plainDecimal(
+      share(BigInt(balances.stock) + (BigInt(balances.wrapped) * BigInt(rate)) / WAD),
+      18,
+      6,
+    );
+  const quantity = share(maxWrappedQuantity(balances, series, rate));
+  return unit === 'usdg'
+    ? plainDecimal((quantity * BigInt(series.strikePricePerWrappedUSDG)) / WAD, 6, 2)
+    : plainDecimal((quantity * BigInt(rate)) / WAD, 18, 6);
 }
 export function amount(value: string | bigint, decimals = 6, places = 2) {
   const [whole, fraction = ''] = formatUnits(BigInt(value), decimals).split('.');

@@ -100,7 +100,7 @@ test('price changes move offers without silently replacing the selected order; s
   const rows = page.locator('.offer-table tbody tr');
   await expect(rows.first().getByRole('rowheader')).toHaveText('220.00');
   await expect(page.locator('.order-selection')).toContainText('220.00');
-  await page.getByLabel('Quantity', { exact: true }).fill('2');
+  await page.getByLabel('You deposit', { exact: true }).fill('2');
   referencePrice = '218000000';
   await page.clock.runFor(11000);
   await expect(rows.first().getByRole('rowheader')).toHaveText('215.00');
@@ -109,7 +109,7 @@ test('price changes move offers without silently replacing the selected order; s
   await expect(page.locator('.main-cta')).toBeDisabled();
   await rows.first().getByRole('button').first().click();
   await expect(page.locator('.order-selection')).toContainText('215.00');
-  await expect(page.getByLabel('Quantity', { exact: true })).toHaveValue('2');
+  await expect(page.getByLabel('You deposit', { exact: true })).toHaveValue('2');
   await expect(page.locator('.main-cta')).toBeEnabled();
   offline = true;
   await page.clock.runFor(61000);
@@ -153,7 +153,7 @@ test('confirmed quote shows its checked fee and a later fee update clears it', a
     expect(route.request().url()).toMatch(/\/v1\/rfqs$/);
     const order = route.request().postDataJSON();
     const series = market.series.find((s) => s.id === order.seriesId)!;
-    const preview = previewOrder('0.001', series, market, TEST_ACCOUNT);
+    const preview = previewOrder('0.25', series, market, TEST_ACCOUNT, 'usdg');
     expect(order.wrappedQuantity).toBe(preview.wrappedQuantity);
     const demo = createDemoQuote(preview, Math.floor(+TEST_NOW / 1000));
     const fee = (BigInt(demo.quote.grossPremiumUSDG) * BigInt(checkedFee)) / 10000n;
@@ -218,7 +218,7 @@ test('confirmed quote shows its checked fee and a later fee update clears it', a
   await page.goto('/');
   await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
-  await page.getByLabel('Quantity', { exact: true }).fill('0.001');
+  await page.getByLabel('You deposit', { exact: true }).fill('0.25');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   // Reference data still says 10%, but the checked signed quote uses 8%.
   await expect(page.getByRole('dialog')).toContainText('Protocol fee (8%)');
@@ -347,7 +347,7 @@ test('browser fetch reaches gateway directly; an unfunded offer never creates a 
   );
   await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
-  await page.getByLabel('Quantity', { exact: true }).fill('0.001');
+  await page.getByLabel('You deposit', { exact: true }).fill('0.25');
   await page.getByRole('button', { name: 'Get a quote', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Create order' }).getByRole('alert')).toContainText(
     'The dealer cannot fund this quote',
