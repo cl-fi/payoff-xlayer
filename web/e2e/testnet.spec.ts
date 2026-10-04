@@ -60,6 +60,7 @@ async function connect(page: Page) {
   await page.getByRole('button', { name: 'Browser wallet' }).click();
 }
 
+test.use({ timezoneId: 'Asia/Shanghai' });
 test.beforeEach(({ page }) => routeCandles(page));
 
 test('deployed offers, real balances and unavailable quotes', async ({ page }, testInfo) => {
@@ -75,12 +76,16 @@ test('deployed offers, real balances and unavailable quotes', async ({ page }, t
   await expect(
     page.getByRole('table', { name: 'Target price and expiry' }).getByRole('button').first(),
   ).toBeVisible();
+  await expect(
+    page.getByRole('table', { name: 'Target price and expiry' }).getByRole('columnheader').nth(1),
+  ).toContainText(/\d+d \d+h left/);
   await page.locator('.technical-details summary').click();
   await expect(page.locator('.technical-details')).toContainText('Series #');
   await expect(page.locator('.technical-details')).toContainText(
     `1 wNVDAx = ${formatUnits(BigInt(TEST_RATE), 18)} NVDAx`,
   );
-  await expect(page.locator('.technical-details')).toContainText('EDT');
+  // Times are shown in the viewer's own time zone, named after the time.
+  await expect(page.locator('.technical-details')).toContainText('GMT+8');
   await page.getByRole('tab', { name: 'Sell High' }).click();
   await connect(page);
   await expect(page.getByRole('button', { name: 'Quotes unavailable', exact: true })).toBeDisabled();

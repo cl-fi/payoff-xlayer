@@ -109,7 +109,6 @@ export function PriceChart({
   nowMs,
   expiryMs,
   expiryLabel,
-  timeZone,
   targets,
   selected,
   highlighted,
@@ -122,7 +121,6 @@ export function PriceChart({
   nowMs: number;
   expiryMs: number | null;
   expiryLabel: string | null;
-  timeZone?: string;
   targets: ChartTarget[];
   selected: string | null;
   highlighted: string | null;
@@ -223,7 +221,7 @@ export function PriceChart({
       const c = candles.reduce((a, b) => (Math.abs(b.timeMs - ms) < Math.abs(a.timeMs - ms) ? b : a));
       const cx = x(c.timeMs),
         cy = y(c.close),
-        label = `${price2(c.close)} · ${dateTime(c.timeMs / 1000, timeZone)}`,
+        label = `${price2(c.close)} · ${dateTime(c.timeMs / 1000)}`,
         boxWidth = label.length * 6.4 + 16,
         boxX = Math.min(Math.max(cx - boxWidth / 2, 0), plotWidth - boxWidth);
       crosshair = (
@@ -238,7 +236,7 @@ export function PriceChart({
       );
     }
 
-    const startLabel = dateOnly(startMs / 1000, timeZone);
+    const startLabel = dateOnly(startMs / 1000);
     const showNow = endX - nowX > 44 && nowX > 56;
     body = (
       <svg

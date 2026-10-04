@@ -23,6 +23,7 @@ import {
   precise,
   previewOrder,
   rounded,
+  timeLeft,
   WAD,
 } from '../src/lib/amounts';
 import { parseUnits } from 'viem';
@@ -97,6 +98,17 @@ test('quantity conversion uses integer arithmetic and existing strike SDK', () =
   assert.equal(preview(1).strikeAmountUSDG, '185000000');
   assert(BigInt(p.stockEquivalent) <= WAD);
   assert.equal(parseQuantity('1.000000000000000001'), WAD + 1n);
+});
+test('time left counts down to the hour, then to the minute', () => {
+  const h = 3600,
+    d = 24 * h;
+  assert.equal(timeLeft(5 * d + 11 * h + 59 * 60), '5d 11h left');
+  assert.equal(timeLeft(d), '1d 0h left');
+  assert.equal(timeLeft(d - 1), '23h 59m left');
+  assert.equal(timeLeft(h + 60), '1h 1m left');
+  assert.equal(timeLeft(59 * 60 + 59), '59m left');
+  assert.equal(timeLeft(30), 'Less than 1m left');
+  assert.equal(timeLeft(-5), 'Less than 1m left');
 });
 test('rounded display rounds half-up instead of truncating', () => {
   assert.equal(rounded('999999999999999999', 18, 4), '1.0000');

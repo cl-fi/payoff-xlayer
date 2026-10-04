@@ -120,20 +120,28 @@ export function apr(numerator: string, denominator: string, secondsToExpiry: num
 export function stockTarget(series: ProductSeries, rate: string) {
   return ceilDiv(BigInt(series.strikePricePerWrappedUSDG) * WAD, BigInt(rate));
 }
-export function dateTime(seconds: string | number, timeZone?: string) {
+// Dates and times are shown in the viewer's own time zone; `withZone` names it, e.g. "GMT+8".
+export function dateTime(seconds: string | number, withZone = false) {
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
-    ...(timeZone ? { timeZone, timeZoneName: 'short' as const } : {}),
+    hourCycle: 'h23',
+    ...(withZone ? { timeZoneName: 'short' as const } : {}),
   }).format(Number(seconds) * 1000);
 }
-export function dateOnly(seconds: string | number, timeZone?: string) {
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone }).format(
-    Number(seconds) * 1000,
-  );
+export function dateOnly(seconds: string | number) {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(Number(seconds) * 1000);
+}
+// Time left to a deadline, to the hour while days remain: "5d 11h left", then "11h 20m left", "20m left".
+export function timeLeft(seconds: number) {
+  const minutes = Math.max(0, Math.floor(seconds / 60)),
+    hours = Math.floor(minutes / 60),
+    days = Math.floor(hours / 24);
+  if (days) return `${days}d ${hours % 24}h left`;
+  if (hours) return `${hours}h ${minutes % 60}m left`;
+  return minutes ? `${minutes}m left` : 'Less than 1m left';
 }
 export function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;

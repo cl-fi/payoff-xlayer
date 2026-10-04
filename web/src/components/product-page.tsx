@@ -19,6 +19,7 @@ import {
   previewOrder,
   rounded,
   stockTarget,
+  timeLeft,
   WAD,
 } from '@/lib/amounts';
 import { QUOTES_UNAVAILABLE } from '@/lib/data/testnet';
@@ -144,7 +145,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const readOnly = config.mode === 'testnet';
   const pending = activity.some((tx) => tx.status === 'pending');
   const wrongNetwork = connection?.kind === 'wallet' && connection.chainId !== config.chainId;
-  const timeZone = config.mode === 'demo' ? undefined : 'America/New_York';
   // Changing any order input invalidates both the visible quote and responses still in flight.
   useEffect(() => {
     operation.current++;
@@ -315,7 +315,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
         : `Locks ${amount(preview.strikeAmountUSDG)} USDG at ${target}`;
   const fieldError = calculation.error || (overBalance ? `Exceeds your ${balanceLabel} balance.` : '');
   const expiryLabel = (s: { exerciseEnd: string; days: number }) =>
-    config.mode === 'demo' ? `${s.days} days` : dateOnly(s.exerciseEnd, timeZone);
+    config.mode === 'demo' ? `${s.days} days` : dateOnly(s.exerciseEnd);
   const offerApr = (s: ProductSeries) => {
     const reference =
       config.mode === 'gateway' && market ? referenceQuote(references, s, market.rate, now) : null;
@@ -400,10 +400,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             side={side}
             nowMs={now}
             expiryMs={chartExpiry ? Number(chartExpiry) * 1000 : null}
-            expiryLabel={
-              chartExpiry ? dateOnly(chartExpiry, config.mode === 'demo' ? undefined : timeZone) : null
-            }
-            timeZone={timeZone}
+            expiryLabel={chartExpiry ? dateOnly(chartExpiry) : null}
             targets={chartTargets}
             selected={series && series.exerciseEnd === chartExpiry ? series.strikePricePerWrappedUSDG : null}
             highlighted={hoveredStrike}
@@ -430,7 +427,6 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                     </th>
                     {expiries.map((end) => {
                       const s = openSeries.find((s) => s.exerciseEnd === end)!;
-                      const remainingDays = Math.ceil((Number(end) - now / 1000) / 86400);
                       return (
                         <th scope="col" key={end}>
                           {expiryLabel(s)}
@@ -438,9 +434,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                             {config.mode === 'demo'
                               ? dateTime(end)
                               : now
-                                ? remainingDays < 2
-                                  ? 'Less than 1 day left'
-                                  : `${remainingDays} days left`
+                                ? timeLeft(Number(end) - now / 1000)
                                 : '\u00a0'}
                           </small>
                         </th>
@@ -557,8 +551,8 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                   : 'Temporarily unavailable'
             }
             apr={estimatedApr}
-            start={now ? dateOnly(now / 1000, timeZone) : null}
-            settle={series ? dateOnly(series.exerciseEnd, timeZone) : null}
+            start={now ? dateOnly(now / 1000) : null}
+            settle={series ? dateOnly(series.exerciseEnd) : null}
           />
           <div className="field-label quantity-label">
             <label htmlFor="quantity">You deposit</label>
@@ -708,10 +702,10 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                 <dt>Wrapping rate</dt>
                 <dd data-testid="wrapping-rate">1 wNVDAx = {market && precise(market.rate)} NVDAx</dd>
                 <dt>Trading cutoff</dt>
-                <dd>{dateTime(preview.series.tradeCutoff, timeZone)}</dd>
+                <dd>{dateTime(preview.series.tradeCutoff, true)}</dd>
                 <dt>Exercise window</dt>
                 <dd>
-                  {dateTime(preview.series.exerciseStart, timeZone)} ·{' '}
+                  {dateTime(preview.series.exerciseStart, true)} ·{' '}
                   {(Number(preview.series.exerciseEnd) - Number(preview.series.exerciseStart)) / 60} min
                 </dd>
                 {config.mode !== 'demo' && (
@@ -764,7 +758,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             {estimate && estimatedApr
               ? `${amount(estimate.netPremiumUSDG)} USDG premium · ${estimatedApr}% APR`
               : series
-                ? `Expires ${dateOnly(series.exerciseEnd, timeZone)}`
+                ? `Expires ${dateOnly(series.exerciseEnd)}`
                 : 'No open series'}
           </span>
         </div>
