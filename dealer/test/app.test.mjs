@@ -5,12 +5,15 @@ import { recoverTypedDataAddress } from 'viem';
 import { buildDealerApp } from '../src/app.mjs';
 import { quoteTypedData } from '../../sdk/quotes.mjs';
 import { NoQuote } from '../src/pricing.mjs';
+import { ReferencePriceService } from '../src/reference-price.mjs';
 
 test('authenticated dealer emits gateway-compatible EIP-712 quotes and refuses mismatched/failed requests', async t => {
   const account = privateKeyToAccount(`0x${'1'.padStart(64, '0')}`); // Public test key; never fund.
   const exchange = '0x0000000000000000000000000000000000000010';
   const vault = '0x0000000000000000000000000000000000000020';
-  const now = Date.now();
+  // Keep the clock before this fixture's fixed September 25 option expiry.
+  const now = Date.parse('2026-09-21T16:00:00Z');
+  t.mock.method(Date, 'now', () => now);
   const context = { symbol: 'NVDA', feeBps: 100, assetsPerWrapped: 10n ** 18n, stockQuantity: 10n ** 18n,
     blockNumber: 1n, timestamp: String(Math.floor(now / 1000)), strikeAmountUSDG: '220000000',
     terms: { side: 0, strikePricePerWrappedUSDG: 220000000n, tradeCutoff: BigInt(Math.floor(now / 1000) + 600), exerciseEnd: 1790366400n } };
@@ -22,7 +25,10 @@ test('authenticated dealer emits gateway-compatible EIP-712 quotes and refuses m
       marketOpenMs: now - 10000, marketCloseMs: now + 600000, expirationCloseMs: 1790366400000 };
   } };
   const config = { chainId: 1952, exchange, premiumBps: 5000, premiumBasis: 'net', maxQuoteAgeSeconds: 30, quoteTtlSeconds: 30 };
-  const app = await buildDealerApp({ account, config, token: 'secret', provider,
+  const prices = new ReferencePriceService({ config: { coins: { NVDA: 'xyz:NVDA' }, maxAgeMs: 60000 },
+    price: { sample: async () => ({ oracleMicros: 228000000n, observedAtMs: now }) } });
+  await prices.refresh();
+  const app = await buildDealerApp({ account, config, token: 'secret', provider, prices,
     chain: { health: async () => {}, context: async () => context, funded: async () => {} } });
   t.after(() => app.close());
   const payload = { version: '1', requestId: `0x${'ab'.repeat(32)}`, chainId: 1952, exchange,
@@ -39,4 +45,17 @@ test('authenticated dealer emits gateway-compatible EIP-712 quotes and refuses m
   fail = true;
   assert.deepEqual((await post()).json(), { status: 'no_quote', reason: 'MARKET_DATA_UNAVAILABLE' });
   assert.equal((await post({ ...payload, collectUntil: new Date(now - 1).toISOString() })).json().reason, 'COLLECTION_EXPIRED');
+  fail = false;
+  prices.samples.get('NVDA').priceMicros = '219000000';
+  assert.equal((await post()).json().reason, 'TARGET_OUTSIDE_STRATEGY');
+  prices.samples.get('NVDA').priceMicros = '228000000';
+  const getMarket = provider.quote;
+  provider.quote = async () => {
+    const market = await getMarket();
+    prices.samples.get('NVDA').priceMicros = '219000000';
+    return market;
+  };
+  assert.equal((await post()).json().reason, 'TARGET_OUTSIDE_STRATEGY');
+  prices.samples.get('NVDA').fetchedAtMs = now - 60000;
+  assert.equal((await post()).json().reason, 'REFERENCE_PRICE_UNAVAILABLE');
 });

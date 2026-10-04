@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createPublicClient, custom, decodeFunctionData } from 'viem';
 import { GatewayAdapter } from '../src/lib/data/gateway';
-import { staticMarket } from '../src/lib/data/catalog';
+import { catalog, staticMarket } from '../src/lib/data/catalog';
 import { getConfig } from '../src/lib/config';
 import { previewOrder } from '../src/lib/amounts';
 import { referenceEstimate, referenceQuote } from '../src/lib/data/reference';
@@ -36,7 +36,7 @@ test('published catalog needs no network; formal inquiry verifies only its selec
     client as any,
   );
   const market = await adapter.market();
-  assert.equal(market.series.length, 16);
+  assert.equal(market.series.length, catalog.markets[0].series.length);
   assert.deepEqual(reads, []);
   const preview = previewOrder('1', market.series[0], market, TEST_ACCOUNT);
   const checked = await adapter.selectedMarket(preview);

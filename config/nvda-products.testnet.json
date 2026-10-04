@@ -113,6 +113,496 @@
       "tradeCutoff": "1790969400",
       "exerciseStart": "1790969400",
       "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "200000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "205000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "225000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "230000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "235000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "240000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "245000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "250000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "255000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "260000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "200000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "205000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "210000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "215000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "220000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "250000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "255000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "260000000",
+      "tradeCutoff": "1790969400",
+      "exerciseStart": "1790969400",
+      "exerciseEnd": "1790971200"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "200000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "205000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "210000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "215000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "220000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "225000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "230000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "235000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "240000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "245000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "250000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "255000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "260000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "200000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "205000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "210000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "215000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "220000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "225000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "230000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "235000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "240000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "245000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "250000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "255000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "260000000",
+      "tradeCutoff": "1791574200",
+      "exerciseStart": "1791574200",
+      "exerciseEnd": "1791576000"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "200000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "205000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "210000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "215000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "220000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "225000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "230000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "235000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "240000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "245000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "250000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "255000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 0,
+      "stockTargetPriceUSDG": "260000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "200000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "205000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "210000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "215000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "220000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "225000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "230000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "235000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "240000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "245000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "250000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "255000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
+    },
+    {
+      "side": 1,
+      "stockTargetPriceUSDG": "260000000",
+      "tradeCutoff": "1792179000",
+      "exerciseStart": "1792179000",
+      "exerciseEnd": "1792180800"
     }
   ]
 }

@@ -2315,3 +2315,30 @@ input[type='checkbox'] {
     scroll-behavior: auto !important;
   }
 }
+/* The selection reference has a separate source from the embedded stock chart. */
+.market-reference {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  margin: 0 24px;
+  color: var(--n-500);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.market-reference div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.market-reference strong {
+  color: var(--n-900);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 600px) {
+  .market-reference {
+    margin: 0 16px;
+  }
+}

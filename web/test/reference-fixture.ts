@@ -13,6 +13,18 @@ export function referenceFixture(
     updatedAtMs: nowMs,
     refreshIntervalMs: 30000,
     maxQuoteAgeMs: 30000,
+    prices: [
+      {
+        symbol: 'NVDA',
+        coin: 'xyz:NVDA',
+        source: 'hyperliquid',
+        field: 'oraclePx',
+        status: 'available',
+        priceMicros: '223000000',
+        fetchedAtMs: nowMs,
+        maxAgeMs: 60000,
+      },
+    ],
     markets: c.markets.map((m) => ({
       vault: m.vault,
       rate,

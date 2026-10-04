@@ -22,6 +22,14 @@ export const configSchema = z.strictObject({
   catalogUrl: z.url().default('https://www.payoff.finance/catalog.json'),
   catalogRefreshMs: z.number().int().positive().default(300000),
   referenceIntervalMs: z.number().int().positive().default(30000),
+  referencePrices: z.strictObject({
+    coins: z.record(z.string().regex(/^[A-Z]{1,10}$/), z.string().min(1).max(40)).default({ NVDA: 'xyz:NVDA' }),
+    url: z.url().default('https://api.hyperliquid.xyz/info'),
+    dex: z.string().max(20).default('xyz'),
+    timeoutMs: z.number().int().min(500).max(10000).default(5000),
+    pollMs: z.number().int().min(2000).max(30000).default(10000),
+    maxAgeMs: z.number().int().min(10000).max(60000).default(60000),
+  }).prefault({}),
   settlementIntervalMs: z.number().int().min(1000).default(60000),
   settlementWarningSeconds: z.number().int().positive().default(86400),
   settlementConfirmations: z.number().int().min(1).max(20).default(2),
@@ -49,6 +57,8 @@ export const configSchema = z.strictObject({
   if (new Set(c.markets.map(m => m.vault.toLowerCase())).size !== c.markets.length)
     ctx.addIssue({ code: 'custom', message: 'Duplicate Vault.' });
   for (const market of c.markets) {
+    if (!c.referencePrices.coins[market.symbol])
+      ctx.addIssue({ code: 'custom', message: `Reference price needs a Hyperliquid coin for ${market.symbol}.` });
     if (Object.keys(market.referenceStrikes ?? {}).some(id => !market.seriesIds.includes(id)))
       ctx.addIssue({ code: 'custom', message: 'Reference strikes must belong to listed series.' });
     if (c.autoExercise.enabled && !c.autoExercise.coins[market.symbol])

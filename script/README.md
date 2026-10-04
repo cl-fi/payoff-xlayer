@@ -39,6 +39,14 @@ After deployment, read back chain ID, deployed code, asset bindings, administrat
 
 ## Add series to an existing testnet Vault
 
+The October 2026 grid requests 200–260 USDG native targets in steps of 5 for both
+directions, expiring October 2, 9 and 16 at 16:00 America/New_York. Trading closes
+and exercise starts at 15:30. Product configuration describes intended terms,
+not proof of creation: only verified onchain IDs belong in the catalog and dealer
+allowlists. Verify the exact listed option contracts and expiry calendar before
+broadcasting. October 9/16 add 52 products; October 2 reuses 8 and adds 18 at the
+current unchanged wrapper rate. Preserve existing positions and signatures.
+
 The native NVDAx target grid and fixed timestamps live in `config/nvda-products.testnet.json`.
 Run `node scripts/plan-testnet-series.mjs --output <local-plan.json>` to read one chain snapshot,
 convert native targets to wrapped strikes, and find reusable series. The output includes

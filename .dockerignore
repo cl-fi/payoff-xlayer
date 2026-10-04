@@ -26,3 +26,8 @@ test
 **/.next
 **/test-results
 **/playwright-report
+
+# Public demo builds must never include private strategy or research material.
+research
+dealer/private-v1
+dealer/private-tests

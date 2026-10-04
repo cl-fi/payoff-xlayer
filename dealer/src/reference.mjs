@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { catalogSchema, referenceSnapshotSchema } from '../../sdk/catalog.mjs';
+import { nearestSeries } from '../../sdk/eligibility.mjs';
 import { calculatePremium, marketDataMode, NoQuote, optionFor, same, validateMarket } from './pricing.mjs';
 
 export class ReferenceService {
@@ -8,8 +9,8 @@ export class ReferenceService {
   catalog = null;
   catalogCheckedAt = 0;
   pending = null;
-  constructor({ config, chain, provider, catalogPath, bundledPath, fetcher = fetch, log = () => {} }) {
-    Object.assign(this, { config, chain, provider, catalogPath, bundledPath, fetcher, log });
+  constructor({ config, chain, provider, prices, catalogPath, bundledPath, fetcher = fetch, log = () => {} }) {
+    Object.assign(this, { config, chain, provider, prices, catalogPath, bundledPath, fetcher, log });
   }
   validateCatalog(value) {
     const catalog = catalogSchema.parse(value);
@@ -21,7 +22,10 @@ export class ReferenceService {
     if (!this.catalog) {
       for (const path of [this.catalogPath, this.bundledPath]) {
         if (!path) continue;
-        try { this.catalog = this.validateCatalog(JSON.parse(await readFile(path, 'utf8'))); break; } catch { /* Try the bundled fallback. */ }
+        try {
+          const candidate = this.validateCatalog(JSON.parse(await readFile(path, 'utf8')));
+          if (!this.catalog || Date.parse(candidate.generatedAt) > Date.parse(this.catalog.generatedAt)) this.catalog = candidate;
+        } catch { /* Try the bundled fallback. */ }
       }
     }
     if (Date.now() - this.catalogCheckedAt < this.config.catalogRefreshMs) return;
@@ -69,10 +73,22 @@ export class ReferenceService {
           status: 'unavailable', reason: error instanceof NoQuote ? error.code : 'CHAIN_UNAVAILABLE' });
         continue;
       }
+      // Three visible offers plus two nearby candidates per direction/expiry.
+      // Put all visible offers before candidates, and publish each result as it arrives.
+      const price = this.prices?.get(market.symbol);
+      const visible = nearestSeries(active, input.rate, price, Date.now());
+      const visibleIds = new Set(visible.map(s => s.id));
+      const candidates = nearestSeries(active, input.rate, price, Date.now(), 5);
+      const prioritized = [...visible, ...candidates.filter(s => !visibleIds.has(s.id))];
+      for (const s of prioritized) {
+        const cached = this.snapshot?.quotes.find(q => q.vault === market.vault && q.seriesId === s.id);
+        if (cached) quotes.set(`${market.vault}:${s.id}`, cached);
+      }
+      publish();
       let cursor = 0;
       const worker = async () => {
-        while (cursor < active.length) {
-          const terms = active[cursor++];
+        while (cursor < prioritized.length) {
+          const terms = prioritized[cursor++];
           const base = { vault: market.vault, seriesId: terms.id, terms };
           let quote;
           try {
@@ -93,6 +109,7 @@ export class ReferenceService {
             quote = { ...base, status: 'unavailable', reason: error instanceof NoQuote ? error.code : 'MARKET_DATA_UNAVAILABLE' };
           }
           quotes.set(`${market.vault}:${terms.id}`, quote);
+          publish();
         }
       };
       await Promise.all([worker(), worker()]);

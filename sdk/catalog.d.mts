@@ -7,12 +7,16 @@ export type Catalog = {
     series: (CatalogTerms & { id: string; label: string })[] }[];
 };
 type ReferenceBase = { vault: Address; seriesId: string; terms: CatalogTerms };
+export type ReferencePrice = { symbol: string; coin: string; source: 'hyperliquid'; field: 'oraclePx'; maxAgeMs: number } &
+  ({ status: 'available'; priceMicros: string; fetchedAtMs: number } | { status: 'unavailable' });
+export const referencePriceSchema: z.ZodType<ReferencePrice>;
 export type ReferenceQuote = ReferenceBase & ({ status: 'available'; netPremiumPerWrappedUSDG: string; assetsPerWrapped: string;
   calculatedAtMs: number; marketTimestampMs: number; marketOpenMs: number; marketCloseMs: number; expirationCloseMs: number;
   marketDataMode: 'live' | 'last_valid'; option: { symbol: string; expiration: string; right: 'put' | 'call'; strikeMilli: string };
 } | { status: 'unavailable'; reason: string });
 export type ReferenceSnapshot = { version: 1; chainId: number; exchange: Address; updatedAtMs: number; catalogGeneratedAt: string;
   refreshIntervalMs: number; maxQuoteAgeMs: number;
+  prices?: ReferencePrice[];
   markets: { vault: Address; rate: string; feeBps: number; blockNumber: string; observedAtMs: number }[];
   quotes: ReferenceQuote[];
 };

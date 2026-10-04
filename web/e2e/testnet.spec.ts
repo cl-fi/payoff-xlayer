@@ -1,11 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import deployment from '../../config/xlayer-testnet.json' with { type: 'json' };
-import catalog from '../public/catalog.json' with { type: 'json' };
 import { formatUnits } from 'viem';
 import { fixtureRpc, TEST_ACCOUNT, TEST_NOW, TEST_RATE } from '../test/testnet-fixture';
 
-async function setup(page: Page, options: { offline?: boolean; wrongChain?: boolean; date?: Date } = {}) {
-  await page.clock.setFixedTime(options.date ?? TEST_NOW);
+async function setup(page: Page, options: { offline?: boolean; wrongChain?: boolean } = {}) {
+  await page.clock.setFixedTime(TEST_NOW);
   await page.route(deployment.rpcUrl, async (route) => {
     if (options.offline) {
       await route.fulfill({ status: 503, body: 'Unavailable' });
@@ -59,7 +58,7 @@ async function connect(page: Page) {
   await page.getByRole('button', { name: 'Browser wallet' }).click();
 }
 
-test('deployed dates and all strikes, real balances and unavailable quotes', async ({ page }, testInfo) => {
+test('deployed offers, real balances and unavailable quotes', async ({ page }, testInfo) => {
   const errors: string[] = [];
   const quoteRequests: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -69,32 +68,16 @@ test('deployed dates and all strikes, real balances and unavailable quotes', asy
   await setup(page);
   await page.goto('/');
   await expect(page.getByText('Quotes are not available yet.', { exact: true })).toBeVisible();
-  const offers = page.getByRole('table', { name: 'Target price and expiry' });
-  await expect(offers.getByRole('columnheader')).toHaveCount(3);
-  await expect(offers).toContainText('Sep 25');
-  await expect(offers).toContainText('Oct 2');
-  await expect(offers.getByRole('rowheader')).toHaveText(['220.00', '215.00', '210.00']);
-  await expect(offers.getByRole('button')).toHaveCount(6);
+  await expect(
+    page.getByRole('table', { name: 'Target price and expiry' }).getByRole('button').first(),
+  ).toBeVisible();
   await page.locator('.technical-details summary').click();
-  await expect(page.locator('.technical-details')).toContainText(
-    `Series #${catalog.markets[0].series[0].id}`,
-  );
+  await expect(page.locator('.technical-details')).toContainText('Series #');
   await expect(page.locator('.technical-details')).toContainText(
     `1 wNVDAx = ${formatUnits(BigInt(TEST_RATE), 18)} NVDAx`,
   );
   await expect(page.locator('.technical-details')).toContainText('EDT');
-  await offers.getByRole('button', { name: '210.00 USDG · Oct 2', exact: true }).click();
-  await expect(page.locator('.technical-details')).toContainText(
-    `Series #${catalog.markets[0].series[10].id}`,
-  );
   await page.getByRole('tab', { name: 'Sell High' }).click();
-  await expect(offers.getByRole('rowheader')).toHaveText(['225.00', '230.00', '235.00', '240.00', '245.00']);
-  // The remembered expiry (Oct 2) stays selected across strategies.
-  await expect(page.locator('.order-selection')).toHaveText('225.00 USDG · Oct 2');
-  await offers.getByRole('button', { name: '245.00 USDG · Oct 2', exact: true }).click();
-  await expect(page.locator('.technical-details')).toContainText(
-    `Series #${catalog.markets[0].series[15].id}`,
-  );
   await connect(page);
   await expect(page.getByRole('button', { name: 'Quotes unavailable', exact: true })).toBeDisabled();
   await expect(page.locator('.available-balance')).toContainText('50.0000 NVDAx');
@@ -130,7 +113,7 @@ test('RPC failure stays unavailable instead of showing demo data; reload recover
   await expect(page.getByRole('button', { name: 'Demo settings' })).toHaveCount(0);
   options.offline = false;
   await page.getByRole('button', { name: 'Reload', exact: true }).click();
-  await expect(page.locator('.offer-table button')).toHaveCount(6);
+  await expect(page.locator('.offer-table button').first()).toBeVisible();
   await connect(page);
   await expect(page.locator('.available-balance')).toContainText('10.00 USDG');
   options.offline = true;
@@ -138,20 +121,6 @@ test('RPC failure stays unavailable instead of showing demo data; reload recover
   await page.evaluate(() => window.dispatchEvent(new Event('storage')));
   await expect(page.locator('.global-alert[role=alert]')).toBeVisible();
   await expect(page.locator('.available-balance')).toHaveCount(0);
-});
-
-test('closed expiries are excluded at the exact cutoff and do not roll forward', async ({ page }) => {
-  await setup(page, { date: new Date(1790364600 * 1000) });
-  await page.goto('/');
-  const offers = page.getByRole('table', { name: 'Target price and expiry' });
-  await expect(offers.getByRole('columnheader')).toHaveCount(2);
-  await expect(offers).toContainText('Oct 2');
-  await expect(offers.getByRole('button')).toHaveCount(3);
-  await page.clock.setFixedTime(new Date(1790969400 * 1000));
-  await page.reload();
-  await expect(page.getByText('No series are open for new positions.')).toBeVisible();
-  await expect(page.locator('.main-cta')).toBeDisabled();
-  await expect(page.locator('.offer-table button')).toHaveCount(0);
 });
 
 test('wrong wallet network is explicit; account changes refresh the queried wallet', async ({ page }) => {

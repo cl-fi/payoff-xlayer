@@ -15,7 +15,7 @@ const requestSchema = z.strictObject({
   // The dealer obtains authoritative terms from the chain, never trusts the supplied snapshot.
   snapshot: z.object({}).passthrough(), collectUntil: z.iso.datetime(),
 });
-export async function buildDealerApp({ config, chain, provider, account, token, reference, settlement, autoExercise, logger = false }) {
+export async function buildDealerApp({ config, chain, provider, account, token, reference, prices, settlement, autoExercise, logger = false }) {
   const app = Fastify({ logger: logger ? { level: 'info', redact: ['req.headers.authorization'] } : false, bodyLimit: 16384 });
   const credential = Buffer.from(`Bearer ${token}`);
   let active = 0;
@@ -31,8 +31,11 @@ export async function buildDealerApp({ config, chain, provider, account, token, 
   app.get('/reference-quotes', async (req, reply) => {
     const supplied = Buffer.from(req.headers.authorization ?? '');
     if (credential.length !== supplied.length || !timingSafeEqual(credential, supplied)) return reply.code(401).send({ error: 'UNAUTHORIZED' });
-    if (!reference?.snapshot) return reply.code(503).send({ error: 'REFERENCE_UNAVAILABLE' });
-    return reference.snapshot;
+    if (!reference?.snapshot && !prices) return reply.code(503).send({ error: 'REFERENCE_UNAVAILABLE' });
+    const snapshot = reference?.snapshot ?? { version: 1, chainId: config.chainId, exchange: config.exchange,
+      updatedAtMs: 0, catalogGeneratedAt: new Date(0).toISOString(), refreshIntervalMs: config.referenceIntervalMs,
+      maxQuoteAgeMs: config.maxQuoteAgeSeconds * 1000, markets: [], quotes: [] };
+    return { ...snapshot, prices: prices?.snapshot() ?? [] };
   });
   app.get('/readyz', async (_req, reply) => {
     try {
@@ -52,16 +55,20 @@ export async function buildDealerApp({ config, chain, provider, account, token, 
       const collectUntil = Date.parse(request.collectUntil);
       if (collectUntil <= Date.now() || collectUntil > Date.now() + 60000) throw new NoQuote('COLLECTION_EXPIRED');
       const context = await chain.context(request.order);
+      if (!prices) throw new NoQuote('REFERENCE_PRICE_UNAVAILABLE');
+      prices.assertEligible(context);
       const option = optionFor(context);
       const market = await provider.quote(option);
       const premium = priceQuote(context, market, config);
       await chain.funded(premium.grossPremiumUSDG, context.blockNumber);
       if (Date.now() >= collectUntil || Number(premium.deadline) * 1000 <= Date.now() + 3000) throw new NoQuote('COLLECTION_EXPIRED');
+      const referencePrice = prices.assertEligible(context);
       const quote = { ...request.order, requestId: request.requestId, dealer: account.address,
         strikeAmountUSDG: context.strikeAmountUSDG, ...premium, issuedAt: context.timestamp,
         nonce: BigInt(`0x${randomBytes(32).toString('hex')}`).toString() };
       const signature = await signQuote(account, config.chainId, config.exchange, quote);
       req.log.info({ requestId: request.requestId, ...option, bidMicros: market.bidMicros,
+        referencePriceMicros: referencePrice.priceMicros, referencePriceFetchedAtMs: referencePrice.fetchedAtMs,
         marketDataMode: marketDataMode(market, config), referenceSource: market.referenceSource,
         fallbackReason: market.fallbackReason, marketAgeMs: Math.max(0, Date.now() - market.timestampMs),
         marketTimestampMs: market.timestampMs, wrappedQuantity: request.order.wrappedQuantity,

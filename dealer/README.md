@@ -9,9 +9,25 @@ allowances, alerts, transaction recovery and commands.
 
 ## Public reference module
 
+`src/reference-price.mjs` independently polls Hyperliquid `xyz:NVDA` `oraclePx` every
+10 seconds. The public snapshot's `prices` field includes USD micros, source,
+coin, field, HTTP fetch time and a 60-second maximum age. Failed requests retain
+the previous observation without extending its life. This fetch time is not an
+upstream oracle timestamp. The feed stays independent of automatic exercise and
+does not change its decision policy. Off-session oracle prices can differ from
+the stock chart; the website labels this as the Hyperliquid reference.
+
+The shared `sdk/eligibility.mjs` compares the current stock-equivalent target
+(wrapped strike divided by the current conversion rate, rounded up to USDG micros)
+against that reference. Buy Low requires a lower target, Sell High a higher one;
+equality is excluded. The frontend shows the nearest three per expiry and side.
+The dealer checks freshness and direction both before fetching a premium and
+immediately before signing. Existing signed quotes retain their original TTL.
+An absent or expired price prevents new quotes, and never affects position exits.
+
 `src/reference.mjs` runs in this same process, with separate responsibilities from formal `/quote` requests. It reads the static frontend `/catalog.json` on startup and every `catalogRefreshMs` (default 5 minutes). It keeps the last valid catalog in the dealer volume, with a bundled catalog for initial deployment. Neither browsing nor formal RFQs waits on that website. Wrong-chain catalogs are rejected.
 
-Every `referenceIntervalMs` (default 30 seconds), it reads mutable chain inputs once per active Vault, then prices the published Series with the shared reference-option selection, last-valid-bid provider and premium calculation. Two background workers leave capacity for formal inquiries. Cycles cannot overlap. There are no taker balances, approvals, maker-funding checks, nonce creation or signatures in this path.
+Every `referenceIntervalMs` (default 30 seconds), it reads mutable chain inputs once per active Vault, then prices the nearest three offers plus two nearby candidates per direction and expiry with the shared reference-option selection, last-valid-bid provider and premium calculation. Visible offers run first; results publish incrementally. Two background workers leave capacity for formal inquiries. Cycles cannot overlap. There are no taker balances, approvals, maker-funding checks, nonce creation or signatures in this path.
 
 `GET /reference-quotes` returns the already computed snapshot to the authenticated gateway. It includes per-wrapped-token net premiums, rate/fee snapshots, original market observation times, calculation times and per-Series availability. The gateway exposes it publicly at `/v1/reference-quotes`. Missing data for one option does not suppress other options. A closed Series is removed on refresh and also filtered by the frontend clock. The 50% policy is configurable platform reference pricing, not a limit on competing dealers.
 

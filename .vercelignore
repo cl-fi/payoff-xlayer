@@ -23,6 +23,11 @@ web/playwright-report/
 okx-devday-2026-handoff/
 infra/
 docs/
+research/
+dealer/private-v1/
+dealer/private-tests/
+.claude/
+pitch/
 
 # Local review evidence, credentials and machine-specific files.
 /evidence/

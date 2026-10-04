@@ -132,7 +132,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch {
         if (!cancelled) setReferenceError('Reference updates are temporarily unavailable.');
       } finally {
-        if (!cancelled) timer = setTimeout(() => void refresh(), 30000);
+        if (!cancelled) timer = setTimeout(() => void refresh(), 10000);
       }
     };
     void refresh();

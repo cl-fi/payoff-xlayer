@@ -26,6 +26,7 @@ import { referenceEstimate, referenceQuote } from '@/lib/data/reference';
 import { NvidiaPriceChart } from './nvidia-price-chart';
 import { ScenarioPreview } from './scenario-preview';
 import { TokenIcon } from './token-icon';
+import { nearestSeries, usablePrice } from '../../../sdk/eligibility.mjs';
 
 export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const {
@@ -75,8 +76,13 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     observer.observe(card);
     return () => observer.disconnect();
   }, []);
-  const available = market?.series.filter((s) => s.side === side && Number(s.tradeCutoff) * 1000 > now) ?? [];
-  const expiries = [...new Set(available.map((s) => s.exerciseEnd))].sort((a, b) => Number(a) - Number(b));
+  const price = references?.prices?.find((p) => p.symbol === 'NVDA' && p.coin === 'xyz:NVDA');
+  const requiresPrice = config.mode === 'gateway';
+  const priceReady = !requiresPrice || usablePrice(price, now);
+  const openSeries =
+    market?.series.filter((s) => s.side === side && Number(s.tradeCutoff) * 1000 > now) ?? [];
+  const available = requiresPrice && market ? nearestSeries(openSeries, market.rate, price, now) : openSeries;
+  const expiries = [...new Set(openSeries.map((s) => s.exerciseEnd))].sort((a, b) => Number(a) - Number(b));
   const expiry = selectedExpiry && expiries.includes(selectedExpiry) ? selectedExpiry : expiries[0];
   // Distinct strikes across the open expiries, nearest the market first: descending for Buy Low,
   // ascending for Sell High. Each strike × expiry cell of the offer table is one series.
@@ -87,8 +93,16 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const offer = (strike: string, end: string) =>
     available.find((s) => s.strikePricePerWrappedUSDG === strike && s.exerciseEnd === end);
   const series =
-    available.find((s) => s.id === selectedSeries) ??
-    (expiry ? strikes.map((strike) => offer(strike, expiry)).find(Boolean) : undefined);
+    selectedSeries !== null
+      ? openSeries.find((s) => s.id === selectedSeries)
+      : expiry
+        ? strikes.map((strike) => offer(strike, expiry)).find(Boolean)
+        : undefined;
+  // Remember the initial choice too: a price update must never silently replace an order.
+  useEffect(() => {
+    if (selectedSeries === null && series) setSelectedSeries(series.id);
+  }, [selectedSeries, series]);
+  const selectionUnavailable = selectedSeries !== null && !available.some((s) => s.id === selectedSeries);
   const calculation = useMemo(() => {
     if (!market || !series) return { preview: null, error: '' };
     try {
@@ -139,7 +153,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
     [],
   );
   async function inquire() {
-    if (!adapter || !preview || !connection) return;
+    if (!adapter || !preview || !connection || !priceReady || selectionUnavailable) return;
     const op = ++operation.current;
     setBusy('Requesting a dealer quote…');
     setMessage('');
@@ -262,7 +276,12 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           <button
             role="tab"
             aria-selected={isPut}
-            onClick={() => setSide(0)}
+            onClick={() => {
+              if (side !== 0) {
+                setSelectedSeries(null);
+                setSide(0);
+              }
+            }}
             className={isPut ? 'selected' : ''}
           >
             <Icon name="down" />
@@ -273,7 +292,12 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           <button
             role="tab"
             aria-selected={!isPut}
-            onClick={() => setSide(1)}
+            onClick={() => {
+              if (side !== 1) {
+                setSelectedSeries(null);
+                setSide(1);
+              }
+            }}
             className={!isPut ? 'selected' : ''}
           >
             <Icon name="up" />
@@ -292,6 +316,23 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
             </div>
           </div>
           <NvidiaPriceChart />
+          {requiresPrice && (
+            <div className="market-reference" role="status">
+              <div>
+                <span>Hyperliquid reference</span>
+                <strong>
+                  {priceReady && price?.status === 'available'
+                    ? `$${amount(price.priceMicros)}`
+                    : 'Temporarily unavailable'}
+                </strong>
+              </div>
+              <small title="Uses the xyz:NVDA oracle reference. Fetched time is our last successful request, not the source quote time. This may differ from the stock chart.">
+                {price?.status === 'available'
+                  ? `Fetched ${Math.max(0, Math.floor((now - price.fetchedAtMs) / 1000))}s ago${priceReady ? '' : ' · stale'}`
+                  : 'Waiting for reference price…'}
+              </small>
+            </div>
+          )}
           <div className="offer-panel">
             {available.length ? (
               <table className="offer-table" aria-label="Target price and expiry">
@@ -301,7 +342,7 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
                       Target price<small>USDG per {wrappedInput ? 'wNVDAx' : 'NVDAx'}</small>
                     </th>
                     {expiries.map((end) => {
-                      const s = available.find((s) => s.exerciseEnd === end)!;
+                      const s = openSeries.find((s) => s.exerciseEnd === end)!;
                       const remainingDays = Math.ceil((Number(end) - now / 1000) / 86400);
                       return (
                         <th scope="col" key={end}>
@@ -387,7 +428,11 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               <p className="muted">
                 {error
                   ? 'Series could not be loaded. Please reload.'
-                  : 'No series are open for new positions.'}
+                  : !priceReady
+                    ? 'A fresh reference price is needed to show offers. Retrying automatically.'
+                    : openSeries.length
+                      ? 'No targets on this side of the reference price are available yet.'
+                      : 'No series are open for new positions.'}
               </p>
             )}
           </div>
@@ -403,6 +448,12 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
               </span>
             </div>
           </div>
+          {priceReady && selectedSeries !== null && selectionUnavailable && (
+            <div className="notice" role="status">
+              Your selected target is no longer among the available offers. Select a target again before
+              requesting a new quote.
+            </div>
+          )}
           {readOnly && (
             <div className="notice availability-notice" role="status">
               <strong>Quotes are not available yet.</strong>
@@ -485,7 +536,15 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
           <button
             className="button primary full main-cta"
             onClick={primary}
-            disabled={!!busy || !preview || cutoff || pending || (readOnly && !!connection)}
+            disabled={
+              !!busy ||
+              !preview ||
+              cutoff ||
+              pending ||
+              !priceReady ||
+              selectionUnavailable ||
+              (readOnly && !!connection)
+            }
           >
             {busy ? (
               <>

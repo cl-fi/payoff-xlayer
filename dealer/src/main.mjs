@@ -5,6 +5,7 @@ import { ThetaProvider } from './theta.mjs';
 import { LastValidBidProvider } from './market.mjs';
 import { buildDealerApp } from './app.mjs';
 import { ReferenceService } from './reference.mjs';
+import { ReferencePriceService } from './reference-price.mjs';
 import { SettlementChain } from './settlement-chain.mjs';
 import { SettlementMonitor } from './settlement.mjs';
 import { ManualSettlement } from './settlement-manual.mjs';
@@ -20,7 +21,9 @@ async function main() {
   let provider;
   try { provider = await LastValidBidProvider.open(upstream, process.env.DEALER_BID_CACHE_PATH ?? 'data/last-valid-bids.json'); }
   catch (error) { upstream.close(); throw error; }
-  const reference = new ReferenceService({ config, chain, provider,
+  const prices = new ReferencePriceService({ config: config.referencePrices,
+    price: new HyperliquidPrice({ url: config.referencePrices.url, dex: config.referencePrices.dex, timeoutMs: config.referencePrices.timeoutMs }) });
+  const reference = new ReferenceService({ config, chain, provider, prices,
     catalogPath: process.env.DEALER_CATALOG_PATH ?? '/var/lib/payoff-dealer/catalog.json',
     bundledPath: new URL('../../web/public/catalog.json', import.meta.url) });
   const settlementChain = new SettlementChain(config, rpcUrl, account.address);
@@ -31,12 +34,14 @@ async function main() {
     manual: new ManualSettlement({ chain: settlementChain, account, path: process.env.DEALER_SETTLEMENT_TX_PATH ?? 'data/settlement-transactions.json' }),
     price: new HyperliquidPrice({ url: config.autoExercise.hyperliquidUrl, dex: config.autoExercise.hyperliquidDex, timeoutMs: config.autoExercise.priceTimeoutMs }),
     path: process.env.DEALER_AUTO_EXERCISE_PATH ?? '/var/lib/payoff-dealer/auto-exercise.json' });
-  const app = await buildDealerApp({ config, account, chain, provider, token, reference, settlement, autoExercise, logger: true });
+  const app = await buildDealerApp({ config, account, chain, provider, token, reference, prices, settlement, autoExercise, logger: true });
+  prices.log = data => app.log.warn(data, 'reference price');
   reference.log = data => app.log.info(data, 'reference pricing');
   settlement.log = data => data.event === 'settlement_scan_failed' || data.alerts?.length
     ? app.log.warn(data, 'manual settlement attention') : app.log.info(data, 'manual settlement status');
   autoExercise.log = data => data.alert ? app.log.warn(data, 'automatic exercise attention') : app.log.info(data, 'automatic exercise');
-  app.addHook('onClose', async () => { await Promise.all([reference.stop(), settlement.stop(), autoExercise.stop()]); await provider.close(); });
+  app.addHook('onClose', async () => { await Promise.all([reference.stop(), prices.stop(), settlement.stop(), autoExercise.stop()]); await provider.close(); });
+  await prices.start();
   reference.start();
   await settlement.start();
   await autoExercise.start();

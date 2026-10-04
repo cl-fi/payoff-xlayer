@@ -30,7 +30,7 @@ test('public references share formal pricing, preserve old bid timestamps and pe
       expirationCloseMs: 1790366400000 };
   } };
   const provider = await LastValidBidProvider.open(upstream, join(dir, 'bids.json'));
-  const options = { config, provider, catalogPath: join(dir, 'catalog.json'),
+  const options = { config, provider, prices: { get: () => ({ status: 'available', priceMicros: '223000000', fetchedAtMs: Date.now(), maxAgeMs: 60000 }) }, catalogPath: join(dir, 'catalog.json'),
     fetcher: async () => { catalogReads++; if (offline) throw new Error('offline'); return new Response(JSON.stringify(catalog)); },
     chain: { async referenceMarket() { chainReads++; return { vault: m.vault, rate: m.rate, feeBps: 100, blockNumber: '123', observedAtMs: Date.now() }; } },
   };
@@ -54,12 +54,14 @@ test('public references share formal pricing, preserve old bid timestamps and pe
   assert.equal(restarted.snapshot.quotes.find(q => q.seriesId === m.series[2].id).status, 'unavailable');
   // A different wrapped rate changes both native strike and native quantity, as in formal pricing.
   restarted.chain = { async referenceMarket() { return { vault: m.vault, rate: '2000000000000000000', feeBps: 100, blockNumber: '124', observedAtMs: Date.now() }; } };
+  restarted.prices = { get: () => ({ status: 'available', priceMicros: '111000000', fetchedAtMs: Date.now(), maxAgeMs: 60000 }) };
   offline = false;
   await restarted.refresh();
   const doubled = restarted.snapshot.quotes.find(q => q.seriesId === m.series[0].id);
   assert.equal(doubled.option.strikeMilli, '110000'); assert.equal(doubled.netPremiumPerWrappedUSDG, '1000000');
   config.markets[0].referenceStrikes = Object.fromEntries(m.series.map(s => [s.id, (BigInt(s.strikePricePerWrappedUSDG) / 1000n).toString()]));
   restarted.chain = { async referenceMarket() { return { vault: m.vault, rate: '1001701196801074000', feeBps: 100, blockNumber: '125', observedAtMs: Date.now() }; } };
+  restarted.prices = options.prices;
   await restarted.refresh();
   for (const s of m.series.slice(0, 2)) {
     const q = restarted.snapshot.quotes.find(q => q.seriesId === s.id);
@@ -77,4 +79,37 @@ test('public references share formal pricing, preserve old bid timestamps and pe
 test('a catalog from another chain cannot replace the published domain', () => {
   const service = new ReferenceService({ config: { chainId: rawCatalog.chainId, exchange: rawCatalog.exchange, usdg: rawCatalog.usdg } });
   assert.throws(() => service.validateCatalog({ ...rawCatalog, chainId: 196 }), /Wrong catalog domain/);
+});
+
+test('wide grids quote visible offers before candidates and publish without waiting for the batch', async t => {
+  const now = Date.parse('2026-10-01T12:00:00Z');
+  t.mock.method(Date, 'now', () => now);
+  const catalog = structuredClone(rawCatalog), market = catalog.markets[0];
+  market.rate = '1000000000000000000';
+  market.series = [0, 1].flatMap(side => Array.from({ length: 13 }, (_, i) => ({
+    id: String(side * 13 + i + 1), label: 'test', side, strikePricePerWrappedUSDG: String((200 + i * 5) * 1e6),
+    tradeCutoff: '1791574200', exerciseStart: '1791574200', exerciseEnd: '1791576000',
+  })));
+  const calls = [], waiting = [];
+  const service = new ReferenceService({
+    config: { chainId: catalog.chainId, exchange: catalog.exchange, usdg: catalog.usdg,
+      catalogRefreshMs: 300000, referenceIntervalMs: 30000, maxQuoteAgeSeconds: 30,
+      markets: [{ vault: market.vault, symbol: 'NVDA', seriesIds: market.series.map(s => s.id) }] },
+    prices: { get: () => ({ status: 'available', priceMicros: '228000000', fetchedAtMs: now, maxAgeMs: 60000 }) },
+    chain: { referenceMarket: async () => ({ vault: market.vault, rate: market.rate, feeBps: 100, blockNumber: '1', observedAtMs: now }) },
+    provider: { quote: option => { calls.push(option); return new Promise((_, reject) => waiting.push(() => reject(new NoQuote('NO_VALID_BID_HISTORY')))); } },
+    fetcher: async () => new Response(JSON.stringify(catalog)),
+  });
+  const refresh = service.refresh();
+  while (!waiting.length) await new Promise(r => setImmediate(r));
+  assert.ok(service.snapshot); assert.equal(service.snapshot.markets.length, 1);
+  // Continue the workers without real quotes; only the eligible nearby grid is touched.
+  for (let i = 0; i < 10; i++) {
+    while (waiting.length) waiting.shift()();
+    await new Promise(r => setImmediate(r));
+  }
+  await refresh;
+  assert.equal(calls.length, 10);
+  assert.deepEqual(calls.slice(0, 6).map(o => `${o.right}:${o.strikeMilli}`),
+    ['put:225000', 'put:220000', 'put:215000', 'call:230000', 'call:235000', 'call:240000']);
 });

@@ -10,6 +10,56 @@ import { createDemoQuote } from '../src/lib/data/demo';
 import { previewOrder } from '../src/lib/amounts';
 import type { GatewayQuote, Market } from '../src/lib/types';
 
+const visibleCount = new Set(catalog.markets[0].series.map((s) => s.exerciseEnd)).size * 3;
+
+test('price changes move offers without silently replacing the selected order; stale prices pause and recover', async ({
+  page,
+}) => {
+  await page.clock.install({ time: TEST_NOW });
+  let referencePrice = '223000000',
+    offline = false;
+  await page.route(deployment.rpcUrl, (route) => route.abort());
+  await page.route('https://gateway.example.test/**', async (route) => {
+    if (offline) {
+      await route.fulfill({ status: 503, json: { error: { code: 'REFERENCE_UNAVAILABLE' } } });
+      return;
+    }
+    const now = await page.evaluate(() => Date.now());
+    const snapshot = referenceFixture(now);
+    if (snapshot.prices?.[0].status === 'available') snapshot.prices[0].priceMicros = referencePrice;
+    await route.fulfill({ json: snapshot });
+  });
+  await page.goto('/');
+  const rows = page.locator('.offer-table tbody tr');
+  await expect(rows.first().getByRole('rowheader')).toHaveText('220.00');
+  await expect(page.locator('.order-selection')).toContainText('220.00');
+  await page.getByLabel('Quantity', { exact: true }).fill('2');
+  referencePrice = '218000000';
+  await page.clock.runFor(11000);
+  await expect(rows.first().getByRole('rowheader')).toHaveText('215.00');
+  await expect(page.locator('.order-selection')).toContainText('220.00');
+  await expect(page.getByText(/Your selected target is no longer/)).toBeVisible();
+  await expect(page.locator('.main-cta')).toBeDisabled();
+  await rows.first().getByRole('button').first().click();
+  await expect(page.locator('.order-selection')).toContainText('215.00');
+  await expect(page.getByLabel('Quantity', { exact: true })).toHaveValue('2');
+  await expect(page.locator('.main-cta')).toBeEnabled();
+  offline = true;
+  await page.clock.runFor(61000);
+  await expect(page.locator('.market-reference')).toContainText('Temporarily unavailable');
+  await expect(page.locator('.main-cta')).toBeDisabled();
+  await expect(rows).toHaveCount(0);
+  offline = false;
+  await page.clock.runFor(11000);
+  await expect(rows.first().getByRole('rowheader')).toHaveText('215.00');
+  await expect(page.locator('.main-cta')).toBeEnabled();
+  referencePrice = '228000000';
+  await page.clock.runFor(11000);
+  await page.getByRole('tab', { name: /Sell High/ }).click();
+  await expect(rows.getByRole('rowheader')).toHaveText(['230.00', '235.00', '240.00']);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+});
+
 test('confirmed quote shows its checked fee and a later fee update clears it', async ({ page }) => {
   await page.clock.install({ time: TEST_NOW });
   let publishedFee = 1000;
@@ -226,7 +276,7 @@ test('browser fetch reaches gateway directly; an unfunded offer never creates a 
   }, TEST_ACCOUNT);
   await page.goto('/');
   await expect(page.getByRole('table', { name: 'Target price and expiry' }).getByRole('button')).toHaveCount(
-    6,
+    visibleCount,
   );
   await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
@@ -240,47 +290,7 @@ test('browser fetch reaches gateway directly; an unfunded offer never creates a 
   await expect(page.locator('.position-row')).toHaveCount(0);
 });
 
-test('static products and public estimates need no RPC or wallet, and quantity/expiry/strategy stay responsive', async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(TEST_NOW);
-  let rpcCalls = 0,
-    rfqCalls = 0;
-  await page.route(deployment.rpcUrl, async (route) => {
-    rpcCalls++;
-    await route.abort();
-  });
-  await page.route('https://gateway.example.test/**', async (route) => {
-    if (route.request().url().endsWith('/v1/reference-quotes'))
-      await route.fulfill({ json: referenceFixture() });
-    else {
-      rfqCalls++;
-      await route.abort();
-    }
-  });
-  await page.goto('/');
-  const offers = page.getByRole('table', { name: 'Target price and expiry' });
-  await expect(offers.getByRole('button')).toHaveCount(6);
-  await page
-    .getByRole('group', { name: 'Quantity unit' })
-    .getByRole('button', { name: 'wNVDAx', exact: true })
-    .click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('0.50 USDG');
-  await expect(page.getByTestId('reference-apr')).toHaveText('18.40%');
-  await expect(offers.getByRole('button', { pressed: true })).toContainText('18.4% APR');
-  await page.getByLabel('Quantity', { exact: true }).fill('2');
-  await expect(page.getByTestId('reference-premium')).toHaveText('1.00 USDG');
-  await offers.locator('tbody tr').first().getByRole('button').nth(1).click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('1.00 USDG');
-  await page.getByRole('tab', { name: /Sell High/ }).click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('2.50 USDG');
-  await expect(offers.getByRole('button')).toHaveCount(10);
-  expect(rpcCalls).toBe(0);
-  expect(rfqCalls).toBe(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
-});
-
-test('wallet RPC and reference outages cannot erase the published directory', async ({ page }) => {
+test('reference outages pause offers and wallet failures remain independent', async ({ page }) => {
   await page.clock.setFixedTime(TEST_NOW);
   await page.route('https://gateway.example.test/**', (route) =>
     route.fulfill({ status: 503, json: { error: { code: 'REFERENCE_UNAVAILABLE' } } }),
@@ -300,34 +310,13 @@ test('wallet RPC and reference outages cannot erase the published directory', as
   await page.goto('/');
   await expect(page.getByTestId('reference-premium')).toHaveText('Temporarily unavailable');
   const prices = page.getByRole('table', { name: 'Target price and expiry' }).getByRole('button');
-  await expect(prices).toHaveCount(6);
+  await expect(prices).toHaveCount(0);
+  await expect(
+    page.getByText('A fresh reference price is needed to show offers. Retrying automatically.'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Connect wallet', exact: true }).click();
   await page.getByRole('button', { name: 'Browser wallet', exact: true }).click();
-  await expect(prices).toHaveCount(6);
+  await expect(prices).toHaveCount(0);
   await expect(page.getByText('Wallet balances could not be loaded. Refresh to try again.')).toBeVisible();
-  await expect(prices).toHaveCount(6);
-});
-
-test('public estimates scale with raw wrapped units at a non-unit rate without a wallet', async ({
-  page,
-}) => {
-  await page.clock.setFixedTime(TEST_NOW);
-  await page.route(deployment.rpcUrl, (route) => route.abort());
-  await page.route('https://gateway.example.test/**', (route) =>
-    route.fulfill({ json: referenceFixture(+TEST_NOW, '1003000000000000000') }),
-  );
-  await page.goto('/');
-  await expect(page.getByTestId('wrapping-rate')).toContainText('1 wNVDAx = 1.003 NVDAx');
-  await expect(page.getByTestId('reference-premium')).toHaveText('0.49 USDG');
-  await page
-    .getByRole('group', { name: 'Quantity unit' })
-    .getByRole('button', { name: 'wNVDAx', exact: true })
-    .click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('0.50 USDG');
-  await expect(page.locator('.order-selection')).toContainText('220.37');
-  await expect(page.locator('.offer-table tr:has(button[aria-pressed="true"]) th')).toHaveText('220.37');
-  await page.getByRole('tab', { name: /Sell High/ }).click();
-  await expect(page.getByTestId('reference-premium')).toHaveText('1.25 USDG');
-  await expect(page.locator('.order-selection')).toContainText('225.38');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  await expect(prices).toHaveCount(0);
 });

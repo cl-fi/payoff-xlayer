@@ -21,11 +21,18 @@ export const catalogSchema = z.object({
 }).refine(c => new Set(c.markets.map(m => m.vault)).size === c.markets.length);
 
 const timestamp = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const priceBase = { symbol: z.string().regex(/^[A-Z]{1,10}$/), coin: z.string().min(1),
+  source: z.literal('hyperliquid'), field: z.literal('oraclePx'), maxAgeMs: z.number().int().positive().max(60000) };
+export const referencePriceSchema = z.discriminatedUnion('status', [
+  z.object({ ...priceBase, status: z.literal('available'), priceMicros: positive, fetchedAtMs: timestamp }),
+  z.object({ ...priceBase, status: z.literal('unavailable') }),
+]);
 const base = { vault: address, seriesId: positive, terms: termsSchema };
 export const referenceSnapshotSchema = z.object({
   version: z.literal(1), chainId: z.number().int().positive(), exchange: address,
   updatedAtMs: timestamp, catalogGeneratedAt: z.iso.datetime(),
   refreshIntervalMs: z.number().int().positive(), maxQuoteAgeMs: z.number().int().positive(),
+  prices: z.array(referencePriceSchema).default([]),
   markets: z.array(z.object({ vault: address, rate: positive, feeBps: z.number().int().min(0).max(10000),
     blockNumber: uint, observedAtMs: timestamp })),
   quotes: z.array(z.discriminatedUnion('status', [
