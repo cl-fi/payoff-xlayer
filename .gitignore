@@ -37,6 +37,9 @@ docs/
 # Local Vercel project binding and downloaded environment files.
 .vercel/
 
+# Claude Code session worktrees and local launch settings.
+/.claude/
+
 # Pitch deck and recording script, kept out of the public repo.
 pitch/
 
