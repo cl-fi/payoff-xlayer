@@ -32,7 +32,7 @@ import { referenceEstimate, referenceQuote } from '@/lib/data/reference';
 import { PriceChart, type ChartTarget } from './price-chart';
 import { ScenarioPreview } from './scenario-preview';
 import { TokenIcon } from './token-icon';
-import { nearestSeries, usablePrice } from '../../../sdk/eligibility.mjs';
+import { listedSeries, nearestSeries, usablePrice } from '../../../sdk/eligibility.mjs';
 
 type Deposit = { value: string; unit: QuantityUnit; before?: { value: string; unit: QuantityUnit } };
 
@@ -96,8 +96,13 @@ export function ProductPage({ initialSide = 0 }: { initialSide?: 0 | 1 }) {
   const price = references?.prices?.find((p) => p.symbol === 'NVDA' && p.coin === 'xyz:NVDA');
   const requiresPrice = config.mode === 'gateway';
   const priceReady = !requiresPrice || usablePrice(price, now);
-  const openSeries =
-    market?.series.filter((s) => s.side === side && Number(s.tradeCutoff) * 1000 > now) ?? [];
+  // The nearest three expiries; each leaves the table eight hours before it expires.
+  const openSeries = market
+    ? listedSeries(
+        market.series.filter((s) => s.side === side),
+        now,
+      )
+    : [];
   const available = requiresPrice && market ? nearestSeries(openSeries, market.rate, price, now) : openSeries;
   const expiries = [...new Set(openSeries.map((s) => s.exerciseEnd))].sort((a, b) => Number(a) - Number(b));
   const expiry = selectedExpiry && expiries.includes(selectedExpiry) ? selectedExpiry : expiries[0];

@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { catalogSchema, referenceSnapshotSchema } from '../../sdk/catalog.mjs';
-import { nearestSeries } from '../../sdk/eligibility.mjs';
+import { listedSeries, nearestSeries } from '../../sdk/eligibility.mjs';
 import { calculatePremium, marketDataMode, NoQuote, optionFor, same, validateMarket } from './pricing.mjs';
 
 export class ReferenceService {
@@ -64,7 +64,8 @@ export class ReferenceService {
     // One Vault at a time; only two market-data workers, leaving capacity for formal RFQs.
     for (const market of catalog.markets) {
       const configured = this.config.markets.find(m => same(m.vault, market.vault));
-      const active = market.series.filter(s => Number(s.tradeCutoff) * 1000 > Date.now());
+      // Only the expiries the page lists: the nearest three, until eight hours before each one.
+      const active = listedSeries(market.series, Date.now());
       if (!active.length) continue;
       let input;
       try { input = await this.chain.referenceMarket(market); inputs.set(market.vault, input); }

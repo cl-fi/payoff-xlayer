@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { eligibleSeries, nearestSeries, usablePrice } from '../../sdk/eligibility.mjs';
+import { eligibleSeries, listedSeries, nearestSeries, usablePrice } from '../../sdk/eligibility.mjs';
 const now = Date.parse('2026-10-01T12:00:00Z');
 const rate = '1000000000000000000';
 const price = { status: 'available', priceMicros: '228000000', fetchedAtMs: now, maxAgeMs: 60000 };
@@ -33,4 +33,23 @@ test('equal prices, closed series, stale/future samples and wrapped conversions 
   // A fractional target rounds up exactly as the UI does; no float threshold drift.
   assert.equal(eligibleSeries({ ...term(225), strikePricePerWrappedUSDG: '450000001' }, '2000000000000000000',
     { ...price, priceMicros: '225000001' }, now), false);
+});
+
+test('only the three nearest expiries are listed, and each leaves eight hours before it expires', () => {
+  const hour = 3600;
+  const week = 7 * 24 * hour;
+  const first = now / 1000 + 20 * hour;
+  // Trading closes 30 minutes before each expiry, like the testnet grid.
+  const weekly = Array.from({ length: 5 }, (_, i) => first + i * week).flatMap(end => [0, 1].map(side =>
+    ({ ...term(220, side, String(end)), tradeCutoff: String(end - 1800), exerciseStart: String(end - 1800) })));
+  const ends = at => [...new Set(listedSeries(weekly, at).map(s => Number(s.exerciseEnd)))];
+  assert.deepEqual(ends(now), [first, first + week, first + 2 * week]);
+  assert.equal(listedSeries(weekly, now).length, 6);
+  // Still listed one second before the eight-hour mark; replaced by the fourth expiry at the mark.
+  assert.deepEqual(ends((first - 8 * hour) * 1000 - 1000), [first, first + week, first + 2 * week]);
+  assert.deepEqual(ends((first - 8 * hour) * 1000), [first + week, first + 2 * week, first + 3 * week]);
+  // Fewer remaining expiries are listed as they are, and nothing past the grid.
+  assert.deepEqual(ends((first + 3 * week - 8 * hour) * 1000), [first + 4 * week]);
+  assert.deepEqual(listedSeries(weekly, (first + 4 * week) * 1000), []);
+  assert.deepEqual(listedSeries([], now), []);
 });

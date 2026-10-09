@@ -10,8 +10,11 @@ import { createDemoQuote } from '../src/lib/data/demo';
 import { previewOrder } from '../src/lib/amounts';
 import type { GatewayQuote, Market } from '../src/lib/types';
 import { routeCandles } from './hyperliquid';
+import { listedSeries } from '../../sdk/eligibility.mjs';
 
-const visibleCount = new Set(catalog.markets[0].series.map((s) => s.exerciseEnd)).size * 3;
+// Three targets for each listed expiry at the fixed test time.
+const visibleCount =
+  new Set(listedSeries(catalog.markets[0].series, +TEST_NOW).map((s) => s.exerciseEnd)).size * 3;
 
 test.beforeEach(({ page }) => routeCandles(page));
 
