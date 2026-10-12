@@ -20,6 +20,8 @@ import { quoteDigest, signQuote } from '../../../sdk/quotes.mjs';
 import { buildDealerApp } from '../../../dealer/src/app.mjs';
 // @ts-ignore JavaScript service entry point
 import { DealerChain } from '../../../dealer/src/chain.mjs';
+// @ts-ignore JavaScript service entry point
+import { ReferencePriceService } from '../../../dealer/src/reference-price.mjs';
 import { TradingWallet } from '../../../web/src/lib/transactions.js';
 import { readPositions } from '../../../web/src/lib/data/positions.js';
 import { readActivity } from '../../../web/src/lib/activity.js';
@@ -58,6 +60,9 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
   const second = createWalletClient({ account: makerB, chain: foundry, transport: http(rpc) });
   const taker = createWalletClient({ account: user, chain: foundry, transport: http(rpc) });
   for (const account of [makerA, makerB, user]) await publicClient.request({ method: 'anvil_setBalance' as any, params: [account.address, '0x3635c9adc5dea00000'] as any });
+  // The frontend reads positions through the canonical Multicall3, which Anvil does not predeploy.
+  const multicall3 = JSON.parse(await readFile(new URL('../../../test/fixtures/multicall3.json', import.meta.url), 'utf8'));
+  await publicClient.request({ method: 'anvil_setCode' as any, params: [multicall3.address, multicall3.runtimeBytecode] as any });
   const receipt = (hash: Hex) => publicClient.waitForTransactionReceipt({ hash, pollingInterval: 20 });
   const deploy = async (name: string, args: any[] = []): Promise<Address> => {
     const a = await artifact(name);
@@ -129,7 +134,11 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
       premiumBps: 5000, premiumBasis: 'net', quoteTtlSeconds: 30, maxQuoteAgeSeconds: 30 };
     const dealerChain = new DealerChain(dealerConfig, rpc, makerB.address);
     await dealerChain.health();
-    const makerApp = await buildDealerApp({ config: dealerConfig, chain: dealerChain, account: makerB, token: 'integration-token',
+    // Both 180 targets need the reference on their own side: above for the put, below for the call.
+    let referenceMicros = 0n;
+    const prices = new ReferencePriceService({ config: { coins: { NVDA: 'xyz:NVDA' }, maxAgeMs: 60000 },
+      price: { sample: async () => ({ oracleMicros: referenceMicros, observedAtMs: Date.now() }) } });
+    const makerApp = await buildDealerApp({ config: dealerConfig, chain: dealerChain, account: makerB, token: 'integration-token', prices,
       provider: { ready: true, quote: async (option: any) => ({ ...option, bidMicros: '1000000', askMicros: '1100000', bidSize: 5,
         timestampMs: Date.now() - 86400000, marketOpenMs: Date.now() - 90000000, marketCloseMs: Date.now() - 82800000,
         expirationCloseMs: Number(now + 4300n) * 1000 }) } });
@@ -138,7 +147,8 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
       const url = `http://127.0.0.1:${(makerApp.server.address() as { port: number }).port}/quote`;
       const g = new Gateway({ ...cfg, dealers: [{ ...dealer('real-service', url, makerB), bearerTokenEnv: 'TOKEN' }] },
         chain, database.store, new Map([['real-service', 'integration-token']]));
-      for (const seriesId of ['1', '2']) {
+      for (const [seriesId, reference] of [['1', 190000000n], ['2', 170000000n]] as const) {
+        referenceMicros = reference; await prices.refresh();
         const result = (await g.create({ ...order, seriesId }, randomUUID())).body as any;
         assert.equal(result.status, 'quoted', JSON.stringify(result));
         assert.equal(result.selection.quote.netPremiumUSDG, '500000');
@@ -256,7 +266,8 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
         assert.equal(result.status, 'quoted');
         opened.push(await trader.fill(adapter, preview, { kind: 'gateway', feeBps: market.feeBps, requestId: result.requestId, selection: result.selection }, market));
       }
-      const recovered = await readPositions(c, user.address, market, publicClient as any);
+      // Read through the frontend's own client, whose chain lists Multicall3.
+      const recovered = await readPositions(c, user.address, market);
       for (const p of opened) assert.ok(recovered.some(r => r.id === p.id && r.netPremiumUSDG === p.netPremiumUSDG));
       assert.equal(readActivity(storage, c, user.address).some(tx => tx.status === 'pending'), false);
       assert.ok(readActivity(storage, c, user.address).some(tx => tx.kind === 'wrap'));
@@ -268,7 +279,7 @@ test('gateway against deployed contracts on a local Anvil EVM', { timeout: 12000
       await publicClient.request({ method: 'evm_setNextBlockTimestamp' as any, params: [Number(now + 4300n)] as any });
       await publicClient.request({ method: 'evm_mine' as any, params: [] as any });
       await trader.claim(opened[0]);
-      const claimed = await readPositions(c, user.address, market, publicClient as any);
+      const claimed = await readPositions(c, user.address, market);
       for (const p of opened) assert.equal(claimed.find(r => r.id === p.id)?.status, 'claimed');
     }
   });

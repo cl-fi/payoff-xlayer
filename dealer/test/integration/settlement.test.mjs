@@ -14,7 +14,7 @@ import { configSchema } from '../../src/config.mjs';
 import { SettlementChain } from '../../src/settlement-chain.mjs';
 import { SettlementMonitor } from '../../src/settlement.mjs';
 import { ManualSettlement } from '../../src/settlement-manual.mjs';
-import { AutoExercise, windowsOf } from '../../src/auto-exercise.mjs';
+import { AutoExercise, marketDay, windowsOf } from '../../src/auto-exercise.mjs';
 import { parseAssetContext } from '../../src/hyperliquid.mjs';
 
 const require = createRequire(import.meta.url);
@@ -43,7 +43,11 @@ test('manual settlement against real EVM contracts: all four outcomes, funding, 
   const vault = await deploy('SeriesVault', [usd, wrapped, admin.address, exchange]);
   await write(wallets[0], 'RFQExchange', exchange, 'setVaultAllowed', [vault, true]);
   await write(wallets[0], 'RFQExchange', exchange, 'setDealerAllowed', [dealer.address, true]);
-  const now = (await client.getBlock()).timestamp, start = now + 120n, end = now + 420n;
+  // Automatic exercise skips New York weekends, so open the window on the next weekday.
+  const now = (await client.getBlock()).timestamp;
+  let start = now + 120n;
+  while (['Sat', 'Sun'].includes(marketDay(Number(start + 300n)).weekday)) start += 86400n;
+  const end = start + 300n;
   for (const side of [0, 1]) await write(wallets[0], 'SeriesVault', vault, 'createSeries', [side, 220000000n, start, start, end]);
   for (const wallet of [wallets[1], wallets[2]]) {
     await write(wallets[0], 'MockUSDG', usd, 'mint', [wallet.account.address, 1000000000n]);

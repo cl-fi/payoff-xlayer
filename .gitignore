@@ -39,11 +39,3 @@ docs/
 
 # Claude Code session worktrees and local launch settings.
 /.claude/
-
-# Pitch deck and recording script, kept out of the public repo.
-pitch/
-
-# Private dealer strategy, experiments and historical data stay off public Git.
-/research/
-/dealer/private-v1/
-/dealer/private-tests/
