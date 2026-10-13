@@ -48,7 +48,7 @@ The yield is an option premium. **Sell High** (shown) is a covered call: the use
 | | Inside an exchange | Onchain with Payoff |
 | --- | --- | --- |
 | Who holds the stock | The exchange | **Non-custodial.** A contract holds it, not a company. |
-| Who sets the price | The exchange | **Open quoting.** Any approved market maker can quote each order. |
+| Who sets the price | The exchange | **Open quoting.** Market makers compete to quote each order. |
 | Who can offer it | Only the exchange | **Open distribution** (planned). Any wallet or community can offer it and earn a fee. |
 
 **Today:** one app and one market maker, both operated by Payoff.
@@ -183,6 +183,11 @@ This is a testnet MVP, not an audited production release. Contracts have no prox
 
 **Chenjie Lyu**, founder. Product lead and full-stack engineer who built all of Payoff alone: contracts, quote gateway, market maker service and app. Before Payoff: founding member of Arttoo (2024 to 2026), an RWA startup on Sui, leading its tokenization platform from zero to launch and designing its lending protocol's capital structure. Also prototyped onchain options and Dual Investment on Sui.
 
-## Contact
+## The ask
 
-Partnering or investing? Telegram [@cl_dev](https://t.me/cl_dev) · chenjie.lyu@payoff.finance · [github.com/cl-fi](https://github.com/cl-fi)
+Looking for a co-founder and angels.
+
+- **A commercial co-founder.** Makes Payoff known, brings wallets and investing communities on as partners, and shares fundraising.
+- **Angels and advisors.** Introductions to wallets, investing communities and aggregators.
+
+Contact: Telegram [@cl_dev](https://t.me/cl_dev) · chenjie.lyu@payoff.finance · [github.com/cl-fi](https://github.com/cl-fi)
